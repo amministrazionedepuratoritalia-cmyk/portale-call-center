@@ -134,7 +134,7 @@
     .pin-input { display:flex; gap:12px; justify-content:center; margin:20px 0; }
     .pin-digit { width:58px; height:68px; text-align:center; font-size:30px; font-weight:600; border-radius:13px; padding:0; }
 
-    /* ── BOTTONI REGISTRAZIONE (operatrice) ── */
+    /* ── BOTTONI REGISTRAZIONE (telefonista) ── */
     .reg-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
     .reg-btn { background:var(--surface); border:none; border-radius:16px; padding:16px 14px 14px; box-shadow:var(--sh-xs); cursor:pointer; text-align:left; font-family:inherit; position:relative; transition:transform .12s, box-shadow .12s; min-height:118px; display:flex; flex-direction:column; justify-content:space-between; }
     .reg-btn:hover { box-shadow:var(--sh-sm); }
@@ -261,7 +261,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.2 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.3 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -273,7 +273,7 @@
     <div class="flex" style="min-width:0">
       <div class="avatar" id="op-avatar">--</div>
       <div style="min-width:0">
-        <div id="op-name" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Operatrice</div>
+        <div id="op-name" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Telefonista</div>
         <div id="op-turno-lbl" class="muted" style="font-size:11px">Fuori turno</div>
       </div>
     </div>
@@ -325,7 +325,7 @@
   </div>
   <div class="nav-tabs">
     <div class="tab active" onclick="switchTab(this,'tab-live');renderLive()"><i class="ti ti-broadcast"></i> Adesso</div>
-    <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Operatrici</div>
+    <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Telefoniste</div>
     <div class="tab" onclick="switchTab(this,'tab-andamento');renderAndamento()"><i class="ti ti-chart-bar"></i> Andamento</div>
     <div class="tab" onclick="switchTab(this,'tab-registrazioni');renderRegistrazioni()"><i class="ti ti-list"></i> Registrazioni</div>
     <div class="tab" onclick="switchTab(this,'tab-gestione');renderGestione()"><i class="ti ti-settings"></i> Gestione</div>
@@ -351,7 +351,7 @@ const SUPABASE_URL='https://nhpmsgllgxjqzyynjbwf.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ocG1zZ2xsZ3hqcXp5eW5qYndmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NDY4MjksImV4cCI6MjA5NTUyMjgyOX0.C7FBRoApJnbJQ-D0LxlapNlO-dIF37fT_jYVcdzC8wY';
 const ANNO_INIZIO_DATI=2026, MESE_INIZIO_DATI=10;   // da quando esistono dati (report di ottobre caricati a mano): i menu mese partono da qui
 const INIZIO_SETTIMANA=4;                            // 4 = giovedì → mercoledì (settimana aziendale, come nel Portale Tecnici)
-const MINUTI_INATTIVITA=10;                          // dopo quanti minuti senza registrazioni una operatrice in turno risulta "ferma"
+const MINUTI_INATTIVITA=10;                          // dopo quanti minuti senza registrazioni una telefonista in turno risulta "ferma"
 
 // ── Utilità date ──
 const GIORNI_BREVI=['dom','lun','mar','mer','gio','ven','sab'], MESI_BREVI=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
@@ -394,7 +394,7 @@ const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
 function opDi(id){return operatrici.find(o=>o.id===id)||{id,nome:'?'};}
 function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
-// Attività visibili all'operatrice loggata (l'admin può nasconderne alcune da Gestione → Operatrici)
+// Attività visibili alla telefonista loggata (l'admin può nasconderne alcune da Gestione → Telefoniste)
 function tipiMiei(){const n=currentUser?.tipi_nascosti||[];return tipiAttivi().filter(t=>!n.includes(t.codice));}
 function fontiDi(lista){return [...new Set(lista.filter(t=>t.fonte).map(t=>t.fonte))];}
 // Gruppi di attività: 'contatti' e 'appuntamenti' permettono totali e resa (appuntamenti ogni 100 contatti)
@@ -475,7 +475,7 @@ function cellaTot(regs){const c=contaGruppo(regs,'contatti'),a=contaGruppo(regs,
 function tileFonti(regs,cols){return cols.filter(c=>c.coppia).map(col=>{const{c,a}=contaCol(regs,col);return `<div class="metric fonte-tile" style="border-top:3px solid var(--${col.colore})"><div class="lbl" style="color:var(--${col.colore});font-size:12px">${esc(col.nome)}</div><div class="stats">${statHtml(c,a,true)}</div></div>`;}).join('');}
 // Tre numeri con la parola sotto: contatti, appuntamenti, resa
 function statHtml(c,a,coppia){if(!coppia)return `<div class="stat"><b>${c+a}</b><span>registrate</span></div><div></div><div></div>`;return `<div class="stat"><b>${c}</b><span>contatti</span></div><div class="stat"><b class="c-green">${a}</b><span>appuntamenti</span></div><div class="stat"><b class="c-purple">${c?pct(a,c)+'%':'—'}</b><span>resa</span></div>`;}
-// Scheda di una operatrice: una riga per fonte, più il totale se le fonti sono più di una
+// Scheda di una telefonista: una riga per fonte, più il totale se le fonti sono più di una
 function cardOperatrice(o,regs,opt={}){
   const cols=colonneCompatte(tipiAttivi()).filter(col=>{const{c,a}=contaCol(regs,col);return c||a;});
   const righe=cols.map(col=>{const{c,a}=contaCol(regs,col);return `<div class="op-row"><div class="fn c-${col.colore}">${esc(col.nome)}</div>${statHtml(c,a,col.coppia)}</div>`;}).join('');
@@ -675,7 +675,7 @@ function squadre(){return [...new Set(operatrici.filter(o=>o.ruolo!=='admin'&&o.
 function inSquadra(id){return !_squadra||opDi(id).squadra===_squadra;}
 function filtraSquadra(d){return _squadra?{regs:d.regs.filter(r=>inSquadra(r.operatrice_id)),turni:d.turni.filter(t=>inSquadra(t.operatrice_id))}:d;}
 function setSquadra(q){_squadra=q;onPeriodoChange();}
-// Selettore «Tutte · Mattino · Pomeriggio» (compare solo se almeno una operatrice ha una squadra)
+// Selettore «Tutte · Mattino · Pomeriggio» (compare solo se almeno una telefonista ha una squadra)
 function barraSquadre(){const sq=squadre();if(!sq.length)return'';return `<div class="seg seg-full"><button class="${!_squadra?'on':''}" onclick="setSquadra('')">Tutte le squadre</button>${sq.map(q=>`<button class="${_squadra===q?'on':''}" onclick="setSquadra('${esc(q)}')">${esc(q)}</button>`).join('')}</div>`;}
 function etichettaSquadra(){return _squadra?' · squadra '+esc(_squadra):'';}
 // Con «Tutte»: un riquadro per squadra, cliccabile, per vederle una accanto all'altra
@@ -755,12 +755,12 @@ async function renderLive(evidenzia){
   ops.sort((a,b)=>(stato(b).turno?1:0)-(stato(a).turno?1:0)||app(b.id)-app(a.id)||con(b.id)-con(a.id));
   el.innerHTML=`${barraSquadre()}
     <div class="section-title">In linea adesso · ${labelGiornoLungo(oggi)}${etichettaSquadra()}</div>
-    <div class="online-chips" style="margin-bottom:14px">${aperti.length?aperti.map(t=>{const o=opDi(t.operatrice_id),s=stato(o);return`<span class="chip"><span class="avatar sm">${iniziali(o.nome)}</span><span><b>${esc(o.nome)}</b> <span class="st">dalle ${hhmm(t.inizio)} · ${durata(Date.now()-new Date(t.inizio))}</span></span><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span><button class="btn btn-xs" title="Chiudi il turno (se ha dimenticato)" onclick="chiudiTurnoAdmin(${t.id})"><i class="ti ti-player-stop"></i></button></span>`;}).join(''):'<span class="muted">Nessuna operatrice in turno.</span>'}</div>
+    <div class="online-chips" style="margin-bottom:14px">${aperti.length?aperti.map(t=>{const o=opDi(t.operatrice_id),s=stato(o);return`<span class="chip"><span class="avatar sm">${iniziali(o.nome)}</span><span><b>${esc(o.nome)}</b> <span class="st">dalle ${hhmm(t.inizio)} · ${durata(Date.now()-new Date(t.inizio))}</span></span><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span><button class="btn btn-xs" title="Chiudi il turno (se ha dimenticato)" onclick="chiudiTurnoAdmin(${t.id})"><i class="ti ti-player-stop"></i></button></span>`;}).join(''):'<span class="muted">Nessuna telefonista in turno.</span>'}</div>
     <div class="section-title">Oggi, tutte insieme</div>
     ${G?`<div class="metrics">${metricheGruppi(d.regs)}</div>`:''}
     <div class="metrics">${tileFonti(d.regs,cols)||ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${d.regs.filter(r=>r.tipo_codice===t.codice).length}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
     ${confrontoSquadre(d.regs)}
-    <div class="section-title">Oggi, operatrice per operatrice</div>
+    <div class="section-title">Oggi, telefonista per telefonista</div>
     <div class="op-grid">${ops.map(o=>{const s=stato(o);return cardOperatrice(o,regsDi[o.id]||[],{badge:`<span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span>`,sub:s.turno?`In turno dalle ${hhmm(s.turno.inizio)}${ultimaDi[o.id]?' · ultima registrazione '+hhmm(ultimaDi[o.id]):''}`:(ultimaDi[o.id]?'Ultima registrazione '+hhmm(ultimaDi[o.id]):'Oggi non è ancora entrata'),vuoto:'Ancora niente oggi'});}).join('')}</div>
     <div class="section-title">Ultime registrazioni</div>
     <div class="card card-flush feed" id="live-feed">${d.regs.length?d.regs.slice(0,40).map(r=>rigaReg(r,false,evidenzia&&r.id===evidenzia)).join(''):'<div class="empty">Nessuna registrazione oggi.</div>'}</div>`;
@@ -793,7 +793,7 @@ async function renderOperatrici(){
     <div class="metrics">${metricheGruppi(d.regs)}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
     <div class="metrics">${tileFonti(d.regs,cols)||ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${d.regs.filter(r=>r.tipo_codice===t.codice).length}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
     ${confrontoSquadre(d.regs)}
-    <div class="section-title">Classifica operatrici${G?' · per appuntamenti presi':''}</div>
+    <div class="section-title">Classifica telefoniste${G?' · per appuntamenti presi':''}</div>
     <div class="op-grid">${ops.map((o,i)=>{const g=giorniOp[o.id]?.size||0,h=oreOp[o.id]||0;return cardOperatrice(o,regsDi[o.id]||[],{rank:(regsDi[o.id]||[]).length?i+1:0,sub:[g?g+(g===1?' giorno lavorato':' giorni lavorati'):'',h?ore(h)+' ore in turno':''].filter(Boolean).join(' · ')||'Nessun dato in questo periodo'});}).join('')}</div>
     <div class="muted" style="padding:0 4px 8px">Resa = appuntamenti presi ogni 100 contatti.</div>`;
 }
@@ -814,7 +814,7 @@ async function renderAndamento(){
   const perOra=Array(24).fill(0);regs.forEach(r=>perOra[new Date(r.ora).getHours()]++);
   const h0=Math.min(8,perOra.findIndex(v=>v>0)<0?8:perOra.findIndex(v=>v>0)),h1=Math.max(19,23-[...perOra].reverse().findIndex(v=>v>0));
   const maxOra=Math.max(1,...perOra);
-  // per giorno (settimana / mese) oppure per operatrice (giorno)
+  // per giorno (settimana / mese) oppure per telefonista (giorno)
   let blocco='';
   if(p.mode!=='giorno'){
     const giorni=[];for(let g=p.start;g<=p.end;g=isoAddDays(g,1))giorni.push(g);
@@ -824,7 +824,7 @@ async function renderAndamento(){
   }else{
     const perOp={};regs.forEach(r=>perOp[r.operatrice_id]=(perOp[r.operatrice_id]||0)+1);
     const lista=Object.entries(perOp).sort((a,b)=>b[1]-a[1]),maxO=Math.max(1,...lista.map(x=>x[1]));
-    blocco=`<div class="section-title">${esc(t.nome)} per operatrice</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
+    blocco=`<div class="section-title">${esc(t.nome)} per telefonista</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
   }
   el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()}</div>
     <div class="seg seg-full" style="flex-wrap:wrap">${opzioni.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
@@ -840,22 +840,22 @@ async function renderRegistrazioni(){
   let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo));
   el.innerHTML=`${barraSquadre()}<div class="flex wrap" style="margin-bottom:12px">
-      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le operatrici</option>${operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
+      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le telefoniste</option>${operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
       <select style="width:auto;flex:1;min-width:140px" onchange="_fTipo=this.value;renderRegistrazioni()"><option value="">Tutte le attività</option>${tipi.map(t=>`<option value="${t.codice}" ${_fTipo===t.codice?'selected':''}>${esc(t.nome)}</option>`).join('')}</select>
       <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button>
       <button class="btn btn-primary btn-sm" onclick="apriInserimento()"><i class="ti ti-plus"></i> Inserisci dati passati</button></div>
     <div class="muted" style="padding:0 4px 8px">${regs.length} registrazioni · ${esc(p.label)}</div>
-    <div class="card card-flush table-wrap"><table><thead><tr><th>Quando</th><th>Operatrice</th><th>Attività</th><th>Cliente</th><th>Telefono</th><th>Data app.</th><th>Note</th><th></th></tr></thead><tbody>
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Quando</th><th>Telefonista</th><th>Attività</th><th>Cliente</th><th>Telefono</th><th>Data app.</th><th>Note</th><th></th></tr></thead><tbody>
       ${regs.length?regs.slice(0,500).map(r=>{const t=tipoDi(r.tipo_codice);return`<tr><td class="muted">${labelGiorno(r.data,p.mode==='mese')} ${hhmm(r.ora)}</td><td>${nomeOp(r.operatrice_id)}</td><td><span class="pill bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i> ${esc(t.nome)}</span></td><td>${esc(r.cliente||'')}</td><td>${esc(r.telefono||'')}</td><td>${ddmmyyyy(r.data_appuntamento)}</td><td style="white-space:normal;max-width:260px">${esc(r.note||'')}</td><td><button class="btn btn-icon btn-sm" onclick="modificaReg(${r.id})" title="Modifica"><i class="ti ti-pencil"></i></button> <button class="btn btn-icon btn-sm" onclick="eliminaRegAdmin(${r.id})" title="Elimina"><i class="ti ti-trash"></i></button></td></tr>`;}).join(''):'<tr><td colspan="8" class="empty">Nessuna registrazione.</td></tr>'}
     </tbody></table></div>${regs.length>500?'<div class="muted" style="padding:8px 4px">Mostrate le prime 500: restringi il periodo o usa l\'Excel.</div>':''}`;
 }
-// Inserimento manuale dell'admin: i numeri di un giorno passato per una operatrice (es. la settimana prima del portale)
+// Inserimento manuale dell'admin: i numeri di un giorno passato per una telefonista (es. la settimana prima del portale)
 function apriInserimento(){
   const ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva),ta=tipiAttivi(),fonti=fontiDi(ta);
   const p=periodoCorrente(),giorno=p.mode==='giorno'?p.start:(p.end<oggiIso()?p.end:oggiIso());
   const campo=t=>`<div class="flex between" style="padding:6px 0"><span style="font-size:14px">${esc(t.gruppo==='contatti'?'Contatti':t.gruppo==='appuntamenti'?'Appuntamenti presi':t.nome)}</span><input type="number" min="0" class="ins-n" data-codice="${t.codice}" value="0" style="width:90px;text-align:center;padding:8px"></div>`;
-  apriModal(`<h2>Inserisci dati passati</h2><div class="muted">Totali di un giorno per una operatrice. Compaiono nelle statistiche come registrazioni di quel giorno (ore 12:00).</div>
-    <label>Operatrice</label><select id="ins-op">${ops.map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('')}</select>
+  apriModal(`<h2>Inserisci dati passati</h2><div class="muted">Totali di un giorno per una telefonista. Compaiono nelle statistiche come registrazioni di quel giorno (ore 12:00).</div>
+    <label>Telefonista</label><select id="ins-op">${ops.map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('')}</select>
     <label>Giorno</label><input type="date" id="ins-data" value="${giorno}" max="${oggiIso()}">
     <label>Ore di lavoro quel giorno (opzionale)</label><input type="number" id="ins-ore" min="0" step="0.5" placeholder="es. 4">
     ${fonti.map(f=>`<div class="section-title" style="margin-top:16px">${esc(f)}</div><div class="card" style="padding:6px 14px">${ta.filter(t=>t.fonte===f).map(campo).join('')}</div>`).join('')}
@@ -900,7 +900,7 @@ async function esportaExcel(){
   const righe=[['Data','Ora','Operatrice','Attività','Cliente','Telefono','Data appuntamento','Note'].map(q).join(';')];
   regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),r.note].map(q).join(';')));
   const G=haGruppi();
-  righe.push('');righe.push(['Riepilogo per operatrice','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %']:[]),'Ore in turno'].map(q).join(';'));
+  righe.push('');righe.push(['Riepilogo per telefonista','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %']:[]),'Ore in turno'].map(q).join(';'));
   operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti'))]:[]),ore(h)].map(q).join(';'));});
   const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`call-center-${p.start}${p.end!==p.start?'_'+p.end:''}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
@@ -925,9 +925,9 @@ async function renderGestione(){
       <div class="card card-flush">${avvisi.length?avvisi.map(a=>`<div class="row"><div class="row-ic bg-amber c-amber"><i class="ti ti-speakerphone"></i></div><div class="row-body"><div class="row-title" style="white-space:normal">${esc(a.testo)}</div><div class="row-sub">${ddmmyyyy(a.created_at.slice(0,10))}${!a.attivo?' · nascosto':''}</div></div>
         <button class="btn btn-sm" onclick="toggleAvviso(${a.id},${!a.attivo})">${a.attivo?'Nascondi':'Mostra'}</button><button class="btn btn-icon btn-sm" onclick="eliminaAvviso(${a.id})"><i class="ti ti-trash"></i></button></div>`).join(''):'<div class="empty">Nessun avviso.</div>'}</div>`;
   }
-  el.innerHTML=`<div class="seg seg-full"><button class="${_gest==='operatrici'?'on':''}" onclick="_gest='operatrici';renderGestione()">Operatrici</button><button class="${_gest==='attivita'?'on':''}" onclick="_gest='attivita';renderGestione()">Attività</button><button class="${_gest==='avvisi'?'on':''}" onclick="_gest='avvisi';renderGestione()">Avvisi</button></div>${corpo}`;
+  el.innerHTML=`<div class="seg seg-full"><button class="${_gest==='operatrici'?'on':''}" onclick="_gest='operatrici';renderGestione()">Telefoniste</button><button class="${_gest==='attivita'?'on':''}" onclick="_gest='attivita';renderGestione()">Attività</button><button class="${_gest==='avvisi'?'on':''}" onclick="_gest='avvisi';renderGestione()">Avvisi</button></div>${corpo}`;
 }
-// Fonti e attività singole (senza fonte) che l'operatrice vede, in base a tipi_nascosti
+// Fonti e attività singole (senza fonte) che la telefonista vede, in base a tipi_nascosti
 function descriviVisibili(o){
   const n=o.tipi_nascosti||[],ta=tipiAttivi();
   const fonti=fontiDi(ta).filter(f=>ta.some(t=>t.fonte===f&&!n.includes(t.codice)));
@@ -941,10 +941,10 @@ function apriOperatrice(id){
   const n=o.tipi_nascosti||[],ta=tipiAttivi();
   const spunte=fontiDi(ta).map(f=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${ta.filter(t=>t.fonte===f).map(t=>t.codice).join(',')}" ${ta.filter(t=>t.fonte===f).every(t=>n.includes(t.codice))?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(f)}</span></label>`).join('')
     +ta.filter(t=>!t.fonte).map(t=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${t.codice}" ${n.includes(t.codice)?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(t.nome)}</span></label>`).join('');
-  apriModal(`<h2>${id?'Modifica':'Nuova operatrice'}</h2>
+  apriModal(`<h2>${id?'Modifica':'Nuova telefonista'}</h2>
     <label>Nome</label><input id="g-nome" value="${esc(o.nome)}" placeholder="Nome e cognome">
     <label>PIN (4 cifre)${id?' — lascia vuoto per non cambiarlo':''}</label><input id="g-pin" inputmode="numeric" maxlength="4" placeholder="••••">
-    <label>Ruolo</label><select id="g-ruolo" onchange="document.getElementById('g-vede-box').classList.toggle('hidden',this.value==='admin')"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Operatrice</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
+    <label>Ruolo</label><select id="g-ruolo" onchange="document.getElementById('g-vede-box').classList.toggle('hidden',this.value==='admin')"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Telefonista</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
     <label>Squadra</label><input id="g-squadra" value="${esc(o.squadra||'')}" placeholder="es. Mattino o Pomeriggio" list="squadre-list"><datalist id="squadre-list">${sqOpzioni.map(q=>`<option value="${esc(q)}">`).join('')}</datalist>
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="g-attiva" ${o.attiva?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Attiva (può entrare)</span></label>
     <div id="g-vede-box" ${o.ruolo==='admin'?'class="hidden"':''}><label>Cosa vede e può registrare</label>${spunte||'<div class="muted">Nessuna attività configurata.</div>'}</div>
@@ -960,7 +960,7 @@ async function salvaOperatrice(id){
   catch(e){toast('Errore: '+e.message);}
 }
 async function eliminaOperatrice(id){
-  if(!confirm('Eliminare questa operatrice? Spariscono anche tutte le sue registrazioni. Se vuoi solo bloccarle l\'accesso, togli la spunta "Attiva".'))return;
+  if(!confirm('Eliminare questa telefonista? Spariscono anche tutte le sue registrazioni. Se vuoi solo bloccarle l\'accesso, togli la spunta "Attiva".'))return;
   try{await api(`cc_operatrici?id=eq.${id}`,'DELETE');chiudiModal();await caricaBase();invalidaCache();renderGestione();}catch(e){toast('Errore: '+e.message);}
 }
 function apriTipo(id){
@@ -973,9 +973,9 @@ function apriTipo(id){
     <div><label>Colore</label><select id="t-colore">${COLORI.map(c=>`<option value="${c}" ${c===t.colore?'selected':''}>${c}</option>`).join('')}</select></div></div>
     <label>Fonte (le attività con la stessa fonte stanno nella stessa scheda)</label><input id="t-fonte" value="${esc(t.fonte||'')}" placeholder="es. CC, Stand, Internet, Referenze" list="fonti-list"><datalist id="fonti-list">${[...new Set(tipi.filter(x=>x.fonte).map(x=>x.fonte))].map(f=>`<option value="${esc(f)}">`).join('')}</datalist>
     <label>Conta come</label><select id="t-gruppo"><option value="" ${!t.gruppo?'selected':''}>— nessun gruppo —</option><option value="contatti" ${t.gruppo==='contatti'?'selected':''}>Contatto</option><option value="appuntamenti" ${t.gruppo==='appuntamenti'?'selected':''}>Appuntamento preso</option></select>
-    <label>Obiettivo giornaliero per operatrice (0 = nessuno)</label><input type="number" id="t-ob" min="0" value="${t.obiettivo_giorno||0}">
+    <label>Obiettivo giornaliero per telefonista (0 = nessuno)</label><input type="number" id="t-ob" min="0" value="${t.obiettivo_giorno||0}">
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="t-dett" ${t.chiede_dettaglio?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Chiede cliente, telefono, data e note</span></label>
-    <label class="flex" style="margin-top:10px"><input type="checkbox" id="t-attivo" ${t.attivo?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Visibile alle operatrici</span></label>
+    <label class="flex" style="margin-top:10px"><input type="checkbox" id="t-attivo" ${t.attivo?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Visibile alle telefoniste</span></label>
     <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaTipo(${id||'null'})">Salva</button></div>`);
 }
 async function salvaTipo(id){

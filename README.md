@@ -1,10 +1,10 @@
 # Portale Call Center — Depuratoritalia
 
-Un solo file (`index.html`) + Supabase. Le operatrici registrano quello che fanno con un tap, l'admin vede tutto in tempo reale.
+Un solo file (`index.html`) + Supabase. Le telefoniste registrano quello che fanno con un tap, l'admin vede tutto in tempo reale.
 
 ## Come funziona
-- **Operatrice**: entra con nome + PIN → *Inizia turno* → preme i pulsanti (Chiamate, Appuntamenti…). Ogni tap è salvato subito. In *Storico* vede il suo mese.
-- **Admin**: *Adesso* (chi è in linea, totali di oggi, ultime registrazioni, aggiornamento live), *Operatrici* (confronto per periodo), *Andamento* (grafici per giorno e per ora), *Registrazioni* (elenco, modifica, Excel), *Gestione* (operatrici e PIN, pulsanti/attività, avvisi).
+- **Telefonista**: entra con nome + PIN → *Inizia turno* → preme i pulsanti (Chiamate, Appuntamenti…). Ogni tap è salvato subito. In *Storico* vede il suo mese.
+- **Admin**: *Adesso* (chi è in linea, totali di oggi, ultime registrazioni, aggiornamento live), *Telefoniste* (confronto per periodo), *Andamento* (grafici per giorno e per ora), *Registrazioni* (elenco, modifica, Excel), *Gestione* (telefoniste e PIN, pulsanti/attività, avvisi).
 
 ## Prima messa in funzione
 1. Supabase → SQL Editor → incollare ed eseguire `supabase/schema.sql` (crea le tabelle `cc_*`, il realtime e un utente **Admin** con PIN `0000`).
