@@ -241,7 +241,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.6 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.7 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -478,6 +478,35 @@ async function loadAvvisiOp(){
     <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px"><i class="ti ti-speakerphone"></i> Avvisi</div>
     ${avvisi.map(a=>`<div style="font-size:14px;padding:4px 0">${esc(a.testo)} <span class="muted">· ${ddmm(a.created_at.slice(0,10))}</span></div>`).join('')}</div>`:'';
 }
+// Frasi del giorno per l'admin (approvate da Davide il 04/11/2026), a rotazione una al giorno
+const FRASI_ADMIN=[
+  ['Il telefono non suona da solo. Prendilo in mano.','Wolf of Wall Street'],
+  ['Non riattaccare finché il cliente non compra o non muore.','Wolf of Wall Street'],
+  ['Il caffè è solo per chi chiude.','Glengarry Glen Ross'],
+  ['Primo premio: una Cadillac. Secondo: un set di coltelli. Terzo: sei fuori.','Glengarry Glen Ross'],
+  ['Non esistono problemi, solo obiezioni da superare.','Boiler Room'],
+  ['Agisci come se: come se fossi già il migliore, e lo diventi.','Boiler Room'],
+  ['Non conta quanto forte colpisci, ma quanti colpi incassi e vai avanti.','Rocky Balboa'],
+  ['Chi ha un sogno lo protegge. E lo insegue, ogni mattina.','La ricerca della felicità'],
+  ['Il pranzo è per i deboli. Oggi si chiude.','Wall Street'],
+  ['Vendimi questa penna. Poi vendine altre cento.','Wolf of Wall Street'],
+  ['Non c\'è nobiltà nella povertà: c\'è nobiltà nel lavoro ben fatto.','Wolf of Wall Street'],
+  ['I leader non chiedono motivazione: la danno.','Boiler Room'],
+  ['Tutti vogliono il risultato. Pochi vogliono il lavoro. Tu sei tra i pochi.','Rocky'],
+];
+function fraseDelGiorno(){const p=oggiIso().split('-').map(Number);const n=Math.floor(new Date(p[0],p[1]-1,p[2])/86400000);return FRASI_ADMIN[n%FRASI_ADMIN.length];}
+// Admin: saluto + frase del giorno, solo al primo ingresso della giornata su questo dispositivo
+function salutoAdmin(){
+  const k='cc_saluto_admin_'+currentUser.id;
+  try{if(localStorage.getItem(k)===oggiIso())return;localStorage.setItem(k,oggiIso());}catch(e){}
+  const h=new Date().getHours(),nome=esc(currentUser.nome.split(' ')[0]),s=h<13?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera',[frase,film]=fraseDelGiorno();
+  apriModal(`<div style="text-align:center;padding:10px 0 4px"><div style="font-size:54px;line-height:1;margin-bottom:14px">${h<13?'☀️':h<18?'🔥':'🌙'}</div>
+    <div style="font-size:26px;font-weight:800;letter-spacing:-.6px">${s}, ${nome}!</div>
+    <div class="muted" style="font-size:14px;margin-top:8px">${labelGiornoLungo(oggiIso())}</div>
+    <div style="font-size:18px;font-weight:600;line-height:1.35;margin:22px 8px 6px;letter-spacing:-.3px">«${esc(frase)}»</div>
+    <div class="muted" style="font-size:12px">${esc(film)}</div>
+    <button class="btn btn-primary btn-full" style="margin-top:22px" onclick="chiudiModal()">Andiamo</button></div>`);
+}
 // Primo accesso della giornata: saluto con il nome
 function saluto(){
   const h=new Date().getHours(),nome=esc(currentUser.nome.split(' ')[0]);
@@ -648,6 +677,7 @@ async function avviaAdmin(){
   resetTabs('admin');showScreen('admin');
   invalidaCache();
   await renderLive();
+  salutoAdmin();
   avviaRealtime();
   clearInterval(_timerPoll);_timerPoll=setInterval(()=>{if(!_rtOk){invalidaCache();onPeriodoChange();}},30000);
 }
