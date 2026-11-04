@@ -241,7 +241,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.4 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.5 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -458,15 +458,18 @@ async function avviaOperatrice(){
 let _giornoOp=null;
 async function loadOggiOp(){
   _giornoOp=oggiIso();
-  const [regs,turni]=await Promise.all([
+  const [regs,turni,turniOggi]=await Promise.all([
     api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&select=*&order=ora.desc`),
-    api(`cc_turni?operatrice_id=eq.${currentUser.id}&fine=is.null&select=*&order=inizio.desc`)
+    api(`cc_turni?operatrice_id=eq.${currentUser.id}&fine=is.null&select=*&order=inizio.desc`),
+    api(`cc_turni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&select=id&limit=1`)
   ]);
   regOggi=regs;
   turnoAperto=turni.find(t=>t.data===_giornoOp)||null;
   const vecchi=turni.filter(t=>t.data!==_giornoOp);if(vecchi.length)chiudiTurniVecchi(vecchi);
+  const primoAccesso=!turnoAperto&&!turniOggi.length;   // saluto solo al primo ingresso della giornata
   if(!turnoAperto)await iniziaTurnoOp();
   renderTurnoOp();renderRegGridOp();renderListaOp();
+  if(primoAccesso)saluto();
 }
 async function loadAvvisiOp(){
   try{avvisi=await api('cc_avvisi?attivo=eq.true&select=*&order=created_at.desc');}catch(e){return;}
@@ -474,6 +477,18 @@ async function loadAvvisiOp(){
   box.innerHTML=avvisi.length?`<div class="card" style="border-left:4px solid var(--amber);padding:10px 14px">
     <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px"><i class="ti ti-speakerphone"></i> Avvisi</div>
     ${avvisi.map(a=>`<div style="font-size:14px;padding:4px 0">${esc(a.testo)} <span class="muted">· ${ddmm(a.created_at.slice(0,10))}</span></div>`).join('')}</div>`:'';
+}
+// Primo accesso della giornata: saluto con il nome
+function saluto(){
+  const h=new Date().getHours(),nome=esc(currentUser.nome.split(' ')[0]);
+  const s=h<13?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera';
+  const emoji=h<13?'☀️':h<18?'👋':'🌙';
+  apriModal(`<div style="text-align:center;padding:10px 0 4px"><div style="font-size:54px;line-height:1;margin-bottom:14px">${emoji}</div>
+    <div style="font-size:26px;font-weight:800;letter-spacing:-.6px">${s}, ${nome}!</div>
+    <div class="muted" style="font-size:14px;margin-top:8px">${labelGiornoLungo(oggiIso())} · il tuo turno è iniziato alle ${hhmm(turnoAperto.inizio)}</div>
+    <div style="font-size:15px;margin-top:16px">Buon lavoro: ogni contatto e ogni appuntamento, un tap.</div>
+    <button class="btn btn-primary btn-full" style="margin-top:22px" onclick="chiudiModal()">Iniziamo</button></div>`);
+  setTimeout(()=>{if(document.querySelector('.modal'))chiudiModal();},8000);
 }
 // Il turno parte da solo al login e si chiude con Esci: l'operatrice non deve premere niente
 function renderTurnoOp(){
