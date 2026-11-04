@@ -147,6 +147,9 @@
     .reg-btn .cnt { position:absolute; top:12px; right:14px; font-size:24px; font-weight:800; letter-spacing:-1px; color:var(--text); font-variant-numeric:tabular-nums; }
     .reg-btn .plus { position:absolute; bottom:12px; right:14px; font-size:11px; font-weight:600; color:var(--text4); }
     /* ── SCHEDE PER FONTE (Contatti + Appuntamenti nello stesso riquadro) ── */
+    .sl { color:var(--text4); margin:0 3px; font-weight:400; }
+    table.compatta td.num, table.compatta th.num { white-space:nowrap; }
+    @media(max-width:560px){ table.compatta th, table.compatta td { padding:8px 5px; font-size:12px; } table.compatta .avatar.sm, table.compatta .bar-wrap { display:none; } table.compatta td:first-child { min-width:0 !important; max-width:104px; white-space:normal; line-height:1.2; } table.compatta .sl { margin:0 1px; } }
     .fonte-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:14px; }
     .fonte-card { background:var(--surface); border-radius:16px; box-shadow:var(--sh-xs); padding:12px 14px 6px; }
     .fonte-head { display:flex; align-items:center; gap:10px; padding-bottom:8px; }
@@ -241,7 +244,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.9 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.0 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -443,6 +446,18 @@ function switchTab(el,id){
   screen.querySelectorAll('.page-content > div').forEach(d=>d.classList.toggle('hidden',d.id!==id));
 }
 
+// Tabelle compatte: una colonna per fonte, in ogni casella «contatti / appuntamenti»; le attività senza fonte restano una colonna ciascuna
+function colonneCompatte(ta){
+  const cols=fontiDi(ta).map(f=>{const mie=ta.filter(t=>t.fonte===f);return{key:'f:'+f,nome:f,colore:mie[0].colore,contatti:mie.filter(t=>t.gruppo==='contatti').map(t=>t.codice),app:mie.filter(t=>t.gruppo==='appuntamenti').map(t=>t.codice),coppia:true};});
+  ta.filter(t=>!t.fonte).forEach(t=>cols.push({key:t.codice,nome:t.nome,colore:t.colore,contatti:t.gruppo==='appuntamenti'?[]:[t.codice],app:t.gruppo==='appuntamenti'?[t.codice]:[],coppia:false}));
+  return cols;
+}
+function contaCol(regs,col){return{c:regs.filter(r=>col.contatti.includes(r.tipo_codice)).length,a:regs.filter(r=>col.app.includes(r.tipo_codice)).length};}
+function cellaCol(regs,col,vuotoSeZero=true){const{c,a}=contaCol(regs,col);if(!col.coppia)return (c+a)||(vuotoSeZero?'':'0');if(!c&&!a)return vuotoSeZero?'':'0<span class="sl">/</span>0';return `${c}<span class="sl">/</span><b class="c-green">${a}</b>`;}
+function cellaTot(regs){const c=contaGruppo(regs,'contatti'),a=contaGruppo(regs,'appuntamenti');return `<b>${c}</b><span class="sl">/</span><b class="c-green">${a}</b>`;}
+function tileFonti(regs,cols){return cols.filter(c=>c.coppia).map(col=>{const{c,a}=contaCol(regs,col);return `<div class="metric"><div class="val c-${col.colore}">${c}<span class="sl">/</span><span class="c-green">${a}</span></div><div class="lbl">${esc(col.nome)}</div><div class="sub">resa ${pct(a,c)}%</div></div>`;}).join('');}
+const LEGENDA='<div class="muted" style="padding:0 4px 8px">In ogni casella: <b>contatti</b> <span class="sl">/</span> <b class="c-green">appuntamenti presi</b></div>';
+
 // ══════════════════════════════════════════════════════════════
 //  OPERATRICE
 // ══════════════════════════════════════════════════════════════
@@ -611,16 +626,15 @@ async function loadStoricoOp(){
   const [regs,turni]=await Promise.all([
     api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=id,tipo_codice,data,ora`),
     api(`cc_turni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=*`)]);
-  const ta=tipiMiei(),giorni={};
-  regs.forEach(r=>{(giorni[r.data]=giorni[r.data]||{})[r.tipo_codice]=((giorni[r.data]||{})[r.tipo_codice]||0)+1;});
+  const cols=colonneCompatte(tipiMiei()),G=haGruppi();
+  const regsG={};regs.forEach(r=>(regsG[r.data]=regsG[r.data]||[]).push(r));
   const oreG={};turni.forEach(t=>{oreG[t.data]=(oreG[t.data]||0)+(new Date(t.fine||Date.now())-new Date(t.inizio));});
-  const tot={};regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
   const totOre=Object.values(oreG).reduce((a,b)=>a+b,0);
-  const giorniOrd=Object.keys(Object.assign({},giorni,oreG)).sort().reverse();
-  el.innerHTML=`<div class="metrics">${metricheGruppi(regs)}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div><div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
-    ${giorniOrd.length?`<div class="card card-flush table-wrap"><table><thead><tr><th>Giorno</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}<th class="num">Ore</th></tr></thead><tbody>
-    ${giorniOrd.map(g=>`<tr><td>${labelGiorno(g)}</td>${ta.map(t=>`<td class="num">${giorni[g]?.[t.codice]||''}</td>`).join('')}<td class="num">${oreG[g]?ore(oreG[g]):''}</td></tr>`).join('')}
-    <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}<td class="num">${ore(totOre)}</td></tr></tbody></table></div>`:'<div class="empty">Nessuna registrazione in questo mese.</div>'}`;
+  const giorniOrd=Object.keys(Object.assign({},regsG,oreG)).sort().reverse();
+  el.innerHTML=`<div class="metrics">${metricheGruppi(regs)}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div><div class="metrics">${tileFonti(regs,cols)}</div>
+    ${giorniOrd.length?`${LEGENDA}<div class="card card-flush table-wrap"><table class="compatta"><thead><tr><th>Giorno</th>${cols.map(c=>`<th class="num">${esc(c.nome)}</th>`).join('')}${G?'<th class="num">Totale</th>':''}<th class="num">Ore</th></tr></thead><tbody>
+    ${giorniOrd.map(g=>{const mie=regsG[g]||[];return`<tr><td>${labelGiorno(g)}</td>${cols.map(col=>`<td class="num">${cellaCol(mie,col)}</td>`).join('')}${G?`<td class="num">${mie.length?cellaTot(mie):''}</td>`:''}<td class="num">${oreG[g]?ore(oreG[g]):''}</td></tr>`;}).join('')}
+    <tr class="tot"><td>Totale</td>${cols.map(col=>`<td class="num">${cellaCol(regs,col,false)}</td>`).join('')}${G?`<td class="num">${cellaTot(regs)}</td>`:''}<td class="num">${ore(totOre)}</td></tr></tbody></table></div>`:'<div class="empty">Nessuna registrazione in questo mese.</div>'}`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -688,22 +702,20 @@ async function renderLive(evidenzia){
   const el=document.getElementById('tab-live');
   const oggi=oggiIso(),p={start:oggi,end:oggi};
   let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const ta=tipiAttivi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva);
+  const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva);
   const aperti=d.turni.filter(t=>!t.fine);
   const ultimaDi={};d.regs.forEach(r=>{if(!ultimaDi[r.operatrice_id]||r.ora>ultimaDi[r.operatrice_id])ultimaDi[r.operatrice_id]=r.ora;});
-  const tot={};d.regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
-  const perOp={};d.regs.forEach(r=>{(perOp[r.operatrice_id]=perOp[r.operatrice_id]||{})[r.tipo_codice]=(perOp[r.operatrice_id]?.[r.tipo_codice]||0)+1;});
   const stato=o=>{const t=aperti.find(x=>x.operatrice_id===o.id);if(!t)return{cls:'gray',txt:'fuori turno'};const u=ultimaDi[o.id];const fermaDa=u?(Date.now()-new Date(u))/60000:(Date.now()-new Date(t.inizio))/60000;return fermaDa>MINUTI_INATTIVITA?{cls:'amber',txt:'ferma da '+Math.round(fermaDa)+' min'}:{cls:'green',txt:'attiva'};};
-  const chiamate=ta[0];
+  const regsDi={};d.regs.forEach(r=>(regsDi[r.operatrice_id]=regsDi[r.operatrice_id]||[]).push(r));
   el.innerHTML=`
     <div class="section-title">In linea adesso · ${labelGiornoLungo(oggi)}</div>
     <div class="online-chips" style="margin-bottom:14px">${aperti.length?aperti.map(t=>{const o=opDi(t.operatrice_id),s=stato(o);return`<span class="chip"><span class="avatar sm">${iniziali(o.nome)}</span><span><b>${esc(o.nome)}</b> <span class="st">dalle ${hhmm(t.inizio)} · ${durata(Date.now()-new Date(t.inizio))}</span></span><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span><button class="btn btn-xs" title="Chiudi il turno (se ha dimenticato)" onclick="chiudiTurnoAdmin(${t.id})"><i class="ti ti-player-stop"></i></button></span>`;}).join(''):'<span class="muted">Nessuna operatrice in turno.</span>'}</div>
-    ${haGruppi()?`<div class="metrics">${metricheGruppi(d.regs)}</div>`:''}
-    <div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div>${t.obiettivo_giorno?`<div class="sub">obiettivo ${t.obiettivo_giorno} a testa</div>`:''}</div>`).join('')}</div>
-    <div class="section-title">Per operatrice</div>
-    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th><th>Stato</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}${haGruppi()?'<th class="num">Contatti</th><th class="num">App.</th><th class="num">Resa</th>':''}<th class="num">Ultima</th></tr></thead><tbody>
-      ${ops.map(o=>{const s=stato(o),mie=d.regs.filter(r=>r.operatrice_id===o.id),c=contaGruppo(mie,'contatti'),a=contaGruppo(mie,'appuntamenti');return`<tr><td><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span>${esc(o.nome)}</div></td><td><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span></td>${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}${haGruppi()?`<td class="num"><b>${c||''}</b></td><td class="num"><b>${a||''}</b></td><td class="num">${c?pct(a,c)+'%':''}</td>`:''}<td class="num muted">${ultimaDi[o.id]?hhmm(ultimaDi[o.id]):'—'}</td></tr>`;}).join('')}
-      <tr class="tot"><td>Totale</td><td></td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}${haGruppi()?`<td class="num">${contaGruppo(d.regs,'contatti')}</td><td class="num">${contaGruppo(d.regs,'appuntamenti')}</td><td class="num">${pct(contaGruppo(d.regs,'appuntamenti'),contaGruppo(d.regs,'contatti'))}%</td>`:''}<td></td></tr></tbody></table></div>
+    ${G?`<div class="metrics">${metricheGruppi(d.regs)}</div>`:''}
+    <div class="metrics">${tileFonti(d.regs,cols)||ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${d.regs.filter(r=>r.tipo_codice===t.codice).length}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
+    <div class="section-title">Per operatrice</div>${G?LEGENDA:''}
+    <div class="card card-flush table-wrap"><table class="compatta"><thead><tr><th>Operatrice</th><th>Stato</th>${cols.map(c=>`<th class="num">${esc(c.nome)}</th>`).join('')}${G?'<th class="num">Totale</th><th class="num">Resa</th>':''}<th class="num">Ultima</th></tr></thead><tbody>
+      ${ops.map(o=>{const s=stato(o),mie=regsDi[o.id]||[],c=contaGruppo(mie,'contatti'),a=contaGruppo(mie,'appuntamenti');return`<tr><td><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span>${esc(o.nome)}</div></td><td><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span></td>${cols.map(col=>`<td class="num">${cellaCol(mie,col)}</td>`).join('')}${G?`<td class="num">${(c||a)?cellaTot(mie):''}</td><td class="num">${c?pct(a,c)+'%':''}</td>`:''}<td class="num muted">${ultimaDi[o.id]?hhmm(ultimaDi[o.id]):'—'}</td></tr>`;}).join('')}
+      <tr class="tot"><td>Totale</td><td></td>${cols.map(col=>`<td class="num">${cellaCol(d.regs,col,false)}</td>`).join('')}${G?`<td class="num">${cellaTot(d.regs)}</td><td class="num">${pct(contaGruppo(d.regs,'appuntamenti'),contaGruppo(d.regs,'contatti'))}%</td>`:''}<td></td></tr></tbody></table></div>
     <div class="section-title">Ultime registrazioni</div>
     <div class="card card-flush feed" id="live-feed">${d.regs.length?d.regs.slice(0,40).map(r=>rigaReg(r,false,evidenzia&&r.id===evidenzia)).join(''):'<div class="empty">Nessuna registrazione oggi.</div>'}</div>`;
 }
@@ -721,28 +733,27 @@ async function renderOperatrici(){
   const el=document.getElementById('tab-operatrici'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const ta=tipiAttivi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
-  const perOp={},oreOp={},giorniOp={};
-  d.regs.forEach(r=>{(perOp[r.operatrice_id]=perOp[r.operatrice_id]||{})[r.tipo_codice]=(perOp[r.operatrice_id]?.[r.tipo_codice]||0)+1;(giorniOp[r.operatrice_id]=giorniOp[r.operatrice_id]||new Set()).add(r.data);});
+  const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi();
+  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
+  const regsDi={};d.regs.forEach(r=>(regsDi[r.operatrice_id]=regsDi[r.operatrice_id]||[]).push(r));
+  const oreOp={},giorniOp={};
+  d.regs.forEach(r=>(giorniOp[r.operatrice_id]=giorniOp[r.operatrice_id]||new Set()).add(r.data));
   d.turni.forEach(t=>oreOp[t.operatrice_id]=(oreOp[t.operatrice_id]||0)+(new Date(t.fine||Date.now())-new Date(t.inizio)));
-  const tot={};d.regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
-  // Con i gruppi: base = tutti i contatti, esito = tutti gli appuntamenti. Senza: prima attività e prima con "app" nel codice.
-  const G=haGruppi();
-  const base=G?{codice:'g:contatti',nome:'Contatti',colore:'blue'}:ta[0],esito=G?{codice:'g:appuntamenti',nome:'Appuntamenti',colore:'green'}:(ta.find(t=>/app/i.test(t.codice))||ta[2]);
-  if(G){ops.forEach(o=>{const mie=d.regs.filter(r=>r.operatrice_id===o.id);(perOp[o.id]=perOp[o.id]||{})['g:contatti']=contaGruppo(mie,'contatti');perOp[o.id]['g:appuntamenti']=contaGruppo(mie,'appuntamenti');});tot['g:contatti']=contaGruppo(d.regs,'contatti');tot['g:appuntamenti']=contaGruppo(d.regs,'appuntamenti');}
   const totOre=Object.values(oreOp).reduce((a,b)=>a+b,0);
-  const max=Math.max(1,...ops.map(o=>perOp[o.id]?.[base?.codice]||0));
+  // Ordine e barra: per contatti (senza gruppi: per numero di registrazioni)
+  const peso=id=>G?contaGruppo(regsDi[id]||[],'contatti'):(regsDi[id]||[]).length;
+  const max=Math.max(1,...ops.map(o=>peso(o.id)));
+  ops.sort((a,b)=>peso(b.id)-peso(a.id));
   el.innerHTML=`<div class="section-title">${esc(p.label)}</div>
-    <div class="metrics">${G?metricheGruppi(d.regs):ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')+(base&&esito&&base!==esito?`<div class="metric"><div class="val">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</div><div class="lbl">${esc(esito.nome)} / ${esc(base.nome)}</div></div>`:'')}
-      <div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
-    ${G?`<div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>`:''}
-    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}${G?'<th class="num">Contatti</th><th class="num">App.</th>':''}${base&&esito&&base!==esito?'<th class="num">Resa</th>':''}<th class="num">Giorni</th><th class="num">Ore</th>${base?`<th class="num">${esc(base.nome)}/ora</th>`:''}</tr></thead><tbody>
-      ${ops.sort((a,b)=>(perOp[b.id]?.[base?.codice]||0)-(perOp[a.id]?.[base?.codice]||0)).map(o=>{const n=perOp[o.id]?.[base?.codice]||0,h=oreOp[o.id]||0;return`<tr><td style="min-width:160px"><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span><div style="flex:1">${esc(o.nome)}${!o.attiva?' <span class="pill bg-gray c-gray">disattivata</span>':''}<div class="bar-wrap" style="max-width:140px"><div class="bar fill-${base?.colore||'blue'}" style="width:${pct(n,max)}%"></div></div></div></div></td>
-        ${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}${G?`<td class="num"><b>${n||''}</b></td><td class="num"><b>${perOp[o.id]?.['g:appuntamenti']||''}</b></td>`:''}
-        ${base&&esito&&base!==esito?`<td class="num">${n?pct(perOp[o.id]?.[esito.codice]||0,n)+'%':''}</td>`:''}
-        <td class="num">${giorniOp[o.id]?.size||''}</td><td class="num">${h?ore(h):''}</td>${base?`<td class="num">${h>1800000?(n/(h/3600000)).toFixed(1).replace('.',','):''}</td>`:''}</tr>`;}).join('')}
-      <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}${G?`<td class="num">${tot['g:contatti']}</td><td class="num">${tot['g:appuntamenti']}</td>`:''}${base&&esito&&base!==esito?`<td class="num">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</td>`:''}<td></td><td class="num">${ore(totOre)}</td>${base?'<td></td>':''}</tr></tbody></table></div>
-    <div class="muted" style="padding:6px 4px">Resa = ${esc(esito?.nome||'')} ogni 100 ${esc(base?.nome||'').toLowerCase()}. Ordine della tabella: chi ha più ${esc(base?.nome||'').toLowerCase()}.</div>`;
+    <div class="metrics">${metricheGruppi(d.regs)}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
+    <div class="metrics">${tileFonti(d.regs,cols)||ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${d.regs.filter(r=>r.tipo_codice===t.codice).length}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
+    <div class="section-title">Per operatrice</div>${G?LEGENDA:''}
+    <div class="card card-flush table-wrap"><table class="compatta"><thead><tr><th>Operatrice</th>${cols.map(c=>`<th class="num">${esc(c.nome)}</th>`).join('')}${G?'<th class="num">Totale</th><th class="num">Resa</th>':'<th class="num">Totale</th>'}</tr></thead><tbody>
+      ${ops.map(o=>{const mie=regsDi[o.id]||[],c=contaGruppo(mie,'contatti'),a=contaGruppo(mie,'appuntamenti'),h=oreOp[o.id]||0,g=giorniOp[o.id]?.size||0;return`<tr><td style="min-width:170px"><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span><div style="flex:1"><div>${esc(o.nome)}${!o.attiva?' <span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="muted" style="font-size:11px">${[g?g+(g===1?' giorno':' giorni'):'',h?ore(h)+' h':''].filter(Boolean).join(' · ')||'&nbsp;'}</div><div class="bar-wrap" style="max-width:150px;margin-top:3px"><div class="bar fill-blue" style="width:${pct(peso(o.id),max)}%"></div></div></div></div></td>
+        ${cols.map(col=>`<td class="num">${cellaCol(mie,col)}</td>`).join('')}
+        ${G?`<td class="num">${(c||a)?cellaTot(mie):''}</td><td class="num">${c?pct(a,c)+'%':''}</td>`:`<td class="num">${mie.length||''}</td>`}</tr>`;}).join('')}
+      <tr class="tot"><td>Totale</td>${cols.map(col=>`<td class="num">${cellaCol(d.regs,col,false)}</td>`).join('')}${G?`<td class="num">${cellaTot(d.regs)}</td><td class="num">${pct(contaGruppo(d.regs,'appuntamenti'),contaGruppo(d.regs,'contatti'))}%</td>`:`<td class="num">${d.regs.length}</td>`}</tr></tbody></table></div>
+    <div class="muted" style="padding:6px 4px">Resa = appuntamenti presi ogni 100 contatti. Ordine: chi ha più contatti nel periodo.</div>`;
 }
 
 // ── ANDAMENTO (periodo) ──
