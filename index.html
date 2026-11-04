@@ -227,7 +227,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.0 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.1 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -253,8 +253,8 @@
     <div id="op-tab-oggi">
       <div id="op-avvisi"></div>
       <div class="card turno-card" id="op-turno-card"></div>
-      <div class="section-title">Registra</div>
-      <div class="reg-grid" id="op-reg-grid"></div>
+      <div id="op-riepilogo"></div>
+      <div id="op-reg-grid"></div>
       <div id="op-obiettivi"></div>
       <div class="section-title">Oggi, in ordine di tempo</div>
       <div class="card card-flush" id="op-lista"></div>
@@ -361,6 +361,12 @@ const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
 function opDi(id){return operatrici.find(o=>o.id===id)||{id,nome:'?'};}
 function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
+// Gruppi di attività: 'contatti' e 'appuntamenti' permettono totali e resa (appuntamenti ogni 100 contatti)
+const GRUPPI={contatti:'Contatti',appuntamenti:'Appuntamenti presi'};
+function codiciGruppo(g){return new Set(tipi.filter(t=>t.gruppo===g).map(t=>t.codice));}
+function haGruppi(){return tipi.some(t=>t.attivo&&t.gruppo==='contatti')&&tipi.some(t=>t.attivo&&t.gruppo==='appuntamenti');}
+function contaGruppo(regs,g){const c=codiciGruppo(g);return regs.filter(r=>c.has(r.tipo_codice)).length;}
+function metricheGruppi(regs,extra=''){if(!haGruppi())return '';const c=contaGruppo(regs,'contatti'),a=contaGruppo(regs,'appuntamenti');return `<div class="metric" style="border-top:3px solid var(--blue)"><div class="val">${c}</div><div class="lbl">Contatti totali</div>${extra}</div><div class="metric" style="border-top:3px solid var(--green)"><div class="val">${a}</div><div class="lbl">Appuntamenti totali</div></div><div class="metric" style="border-top:3px solid var(--purple)"><div class="val">${pct(a,c)}%</div><div class="lbl">Resa</div><div class="sub">appuntamenti ogni 100 contatti</div></div>`;}
 
 // ── Avvio ──
 async function caricaBase(){
@@ -473,14 +479,16 @@ async function terminaTurnoOp(){
 }
 async function chiudiTurno(t){await api(`cc_turni?id=eq.${t.id}`,'PATCH',{fine:new Date().toISOString()});}
 function contaOggi(codice){return regOggi.filter(r=>r.tipo_codice===codice).length;}
-function renderRegGridOp(){
-  const grid=document.getElementById('op-reg-grid');
-  grid.innerHTML=tipiAttivi().map(t=>`<button class="reg-btn" id="regbtn-${t.codice}" onclick="registra('${t.codice}')">
+function bottoneTipo(t){return `<button class="reg-btn" id="regbtn-${t.codice}" onclick="registra('${t.codice}')">
       <div class="ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
       <div class="cnt">${contaOggi(t.codice)}</div>
       <div><div class="nm">${esc(t.nome)}</div>${t.descrizione?`<div class="ds">${esc(t.descrizione)}</div>`:''}</div>
       <div class="plus">${t.chiede_dettaglio?'+ dettagli':'+1'}</div>
-    </button>`).join('');
+    </button>`;}
+function renderRegGridOp(){
+  const ta=tipiAttivi(),gruppi=[...new Set(ta.map(t=>t.gruppo||''))];
+  document.getElementById('op-reg-grid').innerHTML=gruppi.map(g=>`<div class="section-title">${gruppi.length>1||g?(GRUPPI[g]||esc(g)||'Altro'):'Registra'}</div><div class="reg-grid">${ta.filter(t=>(t.gruppo||'')===g).map(bottoneTipo).join('')}</div>`).join('');
+  document.getElementById('op-riepilogo').innerHTML=haGruppi()?`<div class="metrics" style="margin-bottom:4px">${metricheGruppi(regOggi)}</div>`:'';
   const ob=tipiAttivi().filter(t=>t.obiettivo_giorno>0);
   document.getElementById('op-obiettivi').innerHTML=ob.length?`<div class="section-title">Obiettivi di oggi</div><div class="card">${ob.map(t=>{const n=contaOggi(t.codice),p=Math.min(100,pct(n,t.obiettivo_giorno));return`<div style="padding:6px 0"><div class="flex between"><span style="font-size:14px">${esc(t.nome)}</span><span style="font-size:13px;font-weight:600" class="${n>=t.obiettivo_giorno?'c-green':''}">${n} / ${t.obiettivo_giorno}${n>=t.obiettivo_giorno?' <i class="ti ti-check"></i>':''}</span></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${p}%"></div></div></div>`;}).join('')}</div>`:'';
 }
@@ -544,7 +552,7 @@ async function loadStoricoOp(){
   const tot={};regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
   const totOre=Object.values(oreG).reduce((a,b)=>a+b,0);
   const giorniOrd=Object.keys(Object.assign({},giorni,oreG)).sort().reverse();
-  el.innerHTML=`<div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
+  el.innerHTML=`<div class="metrics">${metricheGruppi(regs)}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div><div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
     ${giorniOrd.length?`<div class="card card-flush table-wrap"><table><thead><tr><th>Giorno</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}<th class="num">Ore</th></tr></thead><tbody>
     ${giorniOrd.map(g=>`<tr><td>${labelGiorno(g)}</td>${ta.map(t=>`<td class="num">${giorni[g]?.[t.codice]||''}</td>`).join('')}<td class="num">${oreG[g]?ore(oreG[g]):''}</td></tr>`).join('')}
     <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}<td class="num">${ore(totOre)}</td></tr></tbody></table></div>`:'<div class="empty">Nessuna registrazione in questo mese.</div>'}`;
@@ -624,11 +632,12 @@ async function renderLive(evidenzia){
   el.innerHTML=`
     <div class="section-title">In linea adesso · ${labelGiornoLungo(oggi)}</div>
     <div class="online-chips" style="margin-bottom:14px">${aperti.length?aperti.map(t=>{const o=opDi(t.operatrice_id),s=stato(o);return`<span class="chip"><span class="avatar sm">${iniziali(o.nome)}</span><span><b>${esc(o.nome)}</b> <span class="st">dalle ${hhmm(t.inizio)} · ${durata(Date.now()-new Date(t.inizio))}</span></span><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span><button class="btn btn-xs" title="Chiudi il turno (se ha dimenticato)" onclick="chiudiTurnoAdmin(${t.id})"><i class="ti ti-player-stop"></i></button></span>`;}).join(''):'<span class="muted">Nessuna operatrice in turno.</span>'}</div>
+    ${haGruppi()?`<div class="metrics">${metricheGruppi(d.regs)}</div>`:''}
     <div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div>${t.obiettivo_giorno?`<div class="sub">obiettivo ${t.obiettivo_giorno} a testa</div>`:''}</div>`).join('')}</div>
     <div class="section-title">Per operatrice</div>
-    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th><th>Stato</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}<th class="num">Ultima</th></tr></thead><tbody>
-      ${ops.map(o=>{const s=stato(o);return`<tr><td><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span>${esc(o.nome)}</div></td><td><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span></td>${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}<td class="num muted">${ultimaDi[o.id]?hhmm(ultimaDi[o.id]):'—'}</td></tr>`;}).join('')}
-      <tr class="tot"><td>Totale</td><td></td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}<td></td></tr></tbody></table></div>
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th><th>Stato</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}${haGruppi()?'<th class="num">Contatti</th><th class="num">App.</th><th class="num">Resa</th>':''}<th class="num">Ultima</th></tr></thead><tbody>
+      ${ops.map(o=>{const s=stato(o),mie=d.regs.filter(r=>r.operatrice_id===o.id),c=contaGruppo(mie,'contatti'),a=contaGruppo(mie,'appuntamenti');return`<tr><td><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span>${esc(o.nome)}</div></td><td><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span></td>${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}${haGruppi()?`<td class="num"><b>${c||''}</b></td><td class="num"><b>${a||''}</b></td><td class="num">${c?pct(a,c)+'%':''}</td>`:''}<td class="num muted">${ultimaDi[o.id]?hhmm(ultimaDi[o.id]):'—'}</td></tr>`;}).join('')}
+      <tr class="tot"><td>Totale</td><td></td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}${haGruppi()?`<td class="num">${contaGruppo(d.regs,'contatti')}</td><td class="num">${contaGruppo(d.regs,'appuntamenti')}</td><td class="num">${pct(contaGruppo(d.regs,'appuntamenti'),contaGruppo(d.regs,'contatti'))}%</td>`:''}<td></td></tr></tbody></table></div>
     <div class="section-title">Ultime registrazioni</div>
     <div class="card card-flush feed" id="live-feed">${d.regs.length?d.regs.slice(0,40).map(r=>rigaReg(r,false,evidenzia&&r.id===evidenzia)).join(''):'<div class="empty">Nessuna registrazione oggi.</div>'}</div>`;
 }
@@ -651,20 +660,23 @@ async function renderOperatrici(){
   d.regs.forEach(r=>{(perOp[r.operatrice_id]=perOp[r.operatrice_id]||{})[r.tipo_codice]=(perOp[r.operatrice_id]?.[r.tipo_codice]||0)+1;(giorniOp[r.operatrice_id]=giorniOp[r.operatrice_id]||new Set()).add(r.data);});
   d.turni.forEach(t=>oreOp[t.operatrice_id]=(oreOp[t.operatrice_id]||0)+(new Date(t.fine||Date.now())-new Date(t.inizio)));
   const tot={};d.regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
-  const base=ta[0],esito=ta.find(t=>/app/i.test(t.codice))||ta[2];   // tasso = appuntamenti / chiamate
+  // Con i gruppi: base = tutti i contatti, esito = tutti gli appuntamenti. Senza: prima attività e prima con "app" nel codice.
+  const G=haGruppi();
+  const base=G?{codice:'g:contatti',nome:'Contatti',colore:'blue'}:ta[0],esito=G?{codice:'g:appuntamenti',nome:'Appuntamenti',colore:'green'}:(ta.find(t=>/app/i.test(t.codice))||ta[2]);
+  if(G){ops.forEach(o=>{const mie=d.regs.filter(r=>r.operatrice_id===o.id);(perOp[o.id]=perOp[o.id]||{})['g:contatti']=contaGruppo(mie,'contatti');perOp[o.id]['g:appuntamenti']=contaGruppo(mie,'appuntamenti');});tot['g:contatti']=contaGruppo(d.regs,'contatti');tot['g:appuntamenti']=contaGruppo(d.regs,'appuntamenti');}
   const totOre=Object.values(oreOp).reduce((a,b)=>a+b,0);
   const max=Math.max(1,...ops.map(o=>perOp[o.id]?.[base?.codice]||0));
   el.innerHTML=`<div class="section-title">${esc(p.label)}</div>
-    <div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}
-      ${base&&esito&&base!==esito?`<div class="metric"><div class="val">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</div><div class="lbl">${esc(esito.nome)} / ${esc(base.nome)}</div></div>`:''}
+    <div class="metrics">${G?metricheGruppi(d.regs):ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')+(base&&esito&&base!==esito?`<div class="metric"><div class="val">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</div><div class="lbl">${esc(esito.nome)} / ${esc(base.nome)}</div></div>`:'')}
       <div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
-    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}${base&&esito&&base!==esito?'<th class="num">Resa</th>':''}<th class="num">Giorni</th><th class="num">Ore</th>${base?`<th class="num">${esc(base.nome)}/ora</th>`:''}</tr></thead><tbody>
+    ${G?`<div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>`:''}
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}${G?'<th class="num">Contatti</th><th class="num">App.</th>':''}${base&&esito&&base!==esito?'<th class="num">Resa</th>':''}<th class="num">Giorni</th><th class="num">Ore</th>${base?`<th class="num">${esc(base.nome)}/ora</th>`:''}</tr></thead><tbody>
       ${ops.sort((a,b)=>(perOp[b.id]?.[base?.codice]||0)-(perOp[a.id]?.[base?.codice]||0)).map(o=>{const n=perOp[o.id]?.[base?.codice]||0,h=oreOp[o.id]||0;return`<tr><td style="min-width:160px"><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span><div style="flex:1">${esc(o.nome)}${!o.attiva?' <span class="pill bg-gray c-gray">disattivata</span>':''}<div class="bar-wrap" style="max-width:140px"><div class="bar fill-${base?.colore||'blue'}" style="width:${pct(n,max)}%"></div></div></div></div></td>
-        ${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}
+        ${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}${G?`<td class="num"><b>${n||''}</b></td><td class="num"><b>${perOp[o.id]?.['g:appuntamenti']||''}</b></td>`:''}
         ${base&&esito&&base!==esito?`<td class="num">${n?pct(perOp[o.id]?.[esito.codice]||0,n)+'%':''}</td>`:''}
         <td class="num">${giorniOp[o.id]?.size||''}</td><td class="num">${h?ore(h):''}</td>${base?`<td class="num">${h>1800000?(n/(h/3600000)).toFixed(1).replace('.',','):''}</td>`:''}</tr>`;}).join('')}
-      <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}${base&&esito&&base!==esito?`<td class="num">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</td>`:''}<td></td><td class="num">${ore(totOre)}</td>${base?'<td></td>':''}</tr></tbody></table></div>
-    <div class="muted" style="padding:6px 4px">Resa = ${esc(esito?.nome||'')} ogni 100 ${esc(base?.nome||'').toLowerCase()}. L'ordine della tabella segue la prima attività in Gestione → Attività.</div>`;
+      <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}${G?`<td class="num">${tot['g:contatti']}</td><td class="num">${tot['g:appuntamenti']}</td>`:''}${base&&esito&&base!==esito?`<td class="num">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</td>`:''}<td></td><td class="num">${ore(totOre)}</td>${base?'<td></td>':''}</tr></tbody></table></div>
+    <div class="muted" style="padding:6px 4px">Resa = ${esc(esito?.nome||'')} ogni 100 ${esc(base?.nome||'').toLowerCase()}. Ordine della tabella: chi ha più ${esc(base?.nome||'').toLowerCase()}.</div>`;
 }
 
 // ── ANDAMENTO (periodo) ──
@@ -673,8 +685,12 @@ async function renderAndamento(){
   const el=document.getElementById('tab-andamento'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const ta=tipiAttivi();if(!_metricaAnd||!ta.some(t=>t.codice===_metricaAnd))_metricaAnd=ta[0]?.codice;
-  const t=tipoDi(_metricaAnd),regs=d.regs.filter(r=>r.tipo_codice===_metricaAnd);
+  const ta=tipiAttivi(),G=haGruppi();
+  const opzioni=(G?[{codice:'g:contatti',nome:'Tutti i contatti',colore:'blue'},{codice:'g:appuntamenti',nome:'Tutti gli appuntamenti',colore:'green'}]:[]).concat(ta);
+  if(!_metricaAnd||!opzioni.some(t=>t.codice===_metricaAnd))_metricaAnd=opzioni[0]?.codice;
+  const t=opzioni.find(x=>x.codice===_metricaAnd)||tipoDi(_metricaAnd);
+  const codici=_metricaAnd.startsWith('g:')?codiciGruppo(_metricaAnd.slice(2)):new Set([_metricaAnd]);
+  const regs=d.regs.filter(r=>codici.has(r.tipo_codice));
   // per ora del giorno (sempre)
   const perOra=Array(24).fill(0);regs.forEach(r=>perOra[new Date(r.ora).getHours()]++);
   const h0=Math.min(8,perOra.findIndex(v=>v>0)<0?8:perOra.findIndex(v=>v>0)),h1=Math.max(19,23-[...perOra].reverse().findIndex(v=>v>0));
@@ -692,7 +708,7 @@ async function renderAndamento(){
     blocco=`<div class="section-title">${esc(t.nome)} per operatrice</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
   }
   el.innerHTML=`<div class="section-title">${esc(p.label)}</div>
-    <div class="seg seg-full" style="flex-wrap:wrap">${ta.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
+    <div class="seg seg-full" style="flex-wrap:wrap">${opzioni.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
     ${blocco}
     <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card"><div class="chart">${perOra.slice(h0,h1+1).map((v,i)=>`<div class="col"><div class="v">${v||''}</div><div class="b fill-${t.colore}" style="height:${pct(v,maxOra)}%"></div><div class="l">${h0+i}</div></div>`).join('')}</div></div>`;
 }
@@ -735,8 +751,9 @@ async function esportaExcel(){
   const ta=tipiAttivi(),q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
   const righe=[['Data','Ora','Operatrice','Attività','Cliente','Telefono','Data appuntamento','Note'].map(q).join(';')];
   regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),r.note].map(q).join(';')));
-  righe.push('');righe.push(['Riepilogo per operatrice',...ta.map(t=>t.nome),'Ore in turno'].map(q).join(';'));
-  operatrici.filter(o=>o.ruolo!=='admin').forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),ore(h)].map(q).join(';'));});
+  const G=haGruppi();
+  righe.push('');righe.push(['Riepilogo per operatrice',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %']:[]),'Ore in turno'].map(q).join(';'));
+  operatrici.filter(o=>o.ruolo!=='admin').forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti'))]:[]),ore(h)].map(q).join(';'));});
   const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`call-center-${p.start}${p.end!==p.start?'_'+p.end:''}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
@@ -752,7 +769,7 @@ async function renderGestione(){
       <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
   }else if(_gest==='attivita'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">I pulsanti che vedono le operatrici. La prima è quella base (es. Chiamate).</span><button class="btn btn-primary btn-sm" onclick="apriTipo()"><i class="ti ti-plus"></i> Aggiungi</button></div>
-      <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
+      <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${t.gruppo?`<span class="pill bg-${t.gruppo==='contatti'?'blue':'green'} c-${t.gruppo==='contatti'?'blue':'green'}">${GRUPPI[t.gruppo]||esc(t.gruppo)}</span>`:''}${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
         <button class="btn btn-icon btn-sm" ${i===0?'disabled':''} onclick="spostaTipo(${t.id},-1)" title="Su"><i class="ti ti-arrow-up"></i></button><button class="btn btn-icon btn-sm" ${i===tipi.length-1?'disabled':''} onclick="spostaTipo(${t.id},1)" title="Giù"><i class="ti ti-arrow-down"></i></button>
         <button class="btn btn-sm" onclick="apriTipo(${t.id})"><i class="ti ti-pencil"></i></button></div>`).join('')}</div>`;
   }else{
@@ -784,13 +801,14 @@ async function eliminaOperatrice(id){
   try{await api(`cc_operatrici?id=eq.${id}`,'DELETE');chiudiModal();await caricaBase();invalidaCache();renderGestione();}catch(e){toast('Errore: '+e.message);}
 }
 function apriTipo(id){
-  const t=id?tipi.find(x=>x.id===id):{codice:'',nome:'',descrizione:'',icona:'ti-phone',colore:'blue',attivo:true,chiede_dettaglio:false,obiettivo_giorno:0};
-  const icone=['ti-phone','ti-phone-outgoing','ti-phone-incoming','ti-phone-check','ti-phone-x','ti-phone-call','ti-calendar-check','ti-calendar-event','ti-circle-check','ti-mail','ti-message','ti-user-plus','ti-star','ti-thumb-up','ti-thumb-down','ti-clock','ti-flag','ti-coin'];
+  const t=id?tipi.find(x=>x.id===id):{codice:'',nome:'',descrizione:'',icona:'ti-phone',colore:'blue',gruppo:'',attivo:true,chiede_dettaglio:false,obiettivo_giorno:0};
+  const icone=['ti-phone','ti-building-store','ti-world','ti-users','ti-phone-outgoing','ti-phone-incoming','ti-phone-check','ti-phone-x','ti-phone-call','ti-calendar-check','ti-calendar-event','ti-circle-check','ti-mail','ti-message','ti-user-plus','ti-star','ti-thumb-up','ti-thumb-down','ti-clock','ti-flag','ti-coin'];
   apriModal(`<h2>${id?'Modifica attività':'Nuova attività'}</h2>
     <label>Nome del pulsante</label><input id="t-nome" value="${esc(t.nome)}" placeholder="es. Appuntamenti fissati">
     <label>Descrizione breve</label><input id="t-desc" value="${esc(t.descrizione||'')}" placeholder="Quando va premuto">
     <div class="two-col"><div><label>Icona</label><select id="t-icona">${icone.map(i=>`<option value="${i}" ${i===t.icona?'selected':''}>${i.replace('ti-','')}</option>`).join('')}</select></div>
     <div><label>Colore</label><select id="t-colore">${COLORI.map(c=>`<option value="${c}" ${c===t.colore?'selected':''}>${c}</option>`).join('')}</select></div></div>
+    <label>Conta come</label><select id="t-gruppo"><option value="" ${!t.gruppo?'selected':''}>— nessun gruppo —</option><option value="contatti" ${t.gruppo==='contatti'?'selected':''}>Contatto</option><option value="appuntamenti" ${t.gruppo==='appuntamenti'?'selected':''}>Appuntamento preso</option></select>
     <label>Obiettivo giornaliero per operatrice (0 = nessuno)</label><input type="number" id="t-ob" min="0" value="${t.obiettivo_giorno||0}">
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="t-dett" ${t.chiede_dettaglio?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Chiede cliente, telefono, data e note</span></label>
     <label class="flex" style="margin-top:10px"><input type="checkbox" id="t-attivo" ${t.attivo?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Visibile alle operatrici</span></label>
@@ -798,7 +816,7 @@ function apriTipo(id){
 }
 async function salvaTipo(id){
   const v=i=>document.getElementById(i).value.trim();if(!v('t-nome'))return toast('Manca il nome');
-  const body={nome:v('t-nome'),descrizione:v('t-desc')||null,icona:v('t-icona'),colore:v('t-colore'),obiettivo_giorno:+v('t-ob')||0,chiede_dettaglio:document.getElementById('t-dett').checked,attivo:document.getElementById('t-attivo').checked};
+  const body={nome:v('t-nome'),descrizione:v('t-desc')||null,icona:v('t-icona'),colore:v('t-colore'),gruppo:v('t-gruppo')||null,obiettivo_giorno:+v('t-ob')||0,chiede_dettaglio:document.getElementById('t-dett').checked,attivo:document.getElementById('t-attivo').checked};
   try{
     if(id)await api(`cc_tipi?id=eq.${id}`,'PATCH',body);
     else{body.codice=v('t-nome').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||('tipo_'+Date.now());body.ordine=(Math.max(0,...tipi.map(t=>t.ordine))+1);await api('cc_tipi','POST',body);}

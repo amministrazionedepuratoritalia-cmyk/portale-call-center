@@ -26,6 +26,7 @@ create table if not exists cc_tipi (
   colore           text        not null default 'blue',   -- blue | green | amber | red | pink | purple | indigo | gray
   ordine           int         not null default 0,
   attivo           boolean     not null default true,
+  gruppo           text,                                  -- 'contatti' | 'appuntamenti' | null (per totali e resa)
   chiede_dettaglio boolean     not null default false,    -- true = apre la scheda cliente/data/note
   obiettivo_giorno int         not null default 0,        -- 0 = nessun obiettivo
   created_at       timestamptz not null default now()
@@ -89,14 +90,16 @@ drop policy if exists cc_all on cc_registrazioni; create policy cc_all on cc_reg
 drop policy if exists cc_all on cc_turni;         create policy cc_all on cc_turni         for all using (true) with check (true);
 drop policy if exists cc_all on cc_avvisi;        create policy cc_all on cc_avvisi        for all using (true) with check (true);
 
--- Tipi di partenza (modificabili poi da Gestione → Attività)
-insert into cc_tipi (codice, nome, descrizione, icona, colore, ordine, chiede_dettaglio, obiettivo_giorno) values
-  ('chiamata',      'Chiamate',               'Ogni telefonata fatta',             'ti-phone-outgoing',   'blue',   1, false, 80),
-  ('risposta',      'Hanno risposto',         'Contatti utili (parlato con qualcuno)', 'ti-phone-check',  'indigo', 2, false, 0),
-  ('appuntamento',  'Appuntamenti fissati',   'Appuntamento preso per il venditore','ti-calendar-check',  'green',  3, true,  4),
-  ('confermato',    'Appuntamenti confermati','Richiamato e confermato',           'ti-circle-check',     'purple', 4, true,  0),
-  ('richiamo',      'Da richiamare',          'Ha chiesto di essere richiamato',   'ti-phone-call',       'amber',  5, true,  0),
-  ('non_interessato','Non interessati',       'Rifiuto',                           'ti-phone-x',          'red',    6, false, 0)
+-- Tipi di partenza (modificabili poi da Gestione → Attività): contatti e appuntamenti presi, per fonte
+insert into cc_tipi (codice, nome, descrizione, icona, colore, ordine, gruppo, chiede_dettaglio, obiettivo_giorno) values
+  ('contatto_cc',        'Contatti CC',        'Contatti dal call center',  'ti-phone',          'blue',   1, 'contatti',     false, 0),
+  ('contatto_stand',     'Contatti Stand',     'Contatti presi allo stand', 'ti-building-store', 'amber',  2, 'contatti',     false, 0),
+  ('contatto_internet',  'Contatti Internet',  'Contatti arrivati dal web', 'ti-world',          'indigo', 3, 'contatti',     false, 0),
+  ('contatto_referenze', 'Contatti Referenze', 'Contatti da referenze',     'ti-users',          'green',  4, 'contatti',     false, 0),
+  ('app_cc',             'App. presi CC',        'Appuntamento da contatto CC',        'ti-calendar-check', 'blue',   5, 'appuntamenti', true, 0),
+  ('app_stand',          'App. presi Stand',     'Appuntamento da contatto Stand',     'ti-calendar-check', 'amber',  6, 'appuntamenti', true, 0),
+  ('app_internet',       'App. presi Internet',  'Appuntamento da contatto Internet',  'ti-calendar-check', 'indigo', 7, 'appuntamenti', true, 0),
+  ('app_referenze',      'App. presi Referenze', 'Appuntamento da contatto Referenze', 'ti-calendar-check', 'green',  8, 'appuntamenti', true, 0)
 on conflict (codice) do nothing;
 
 -- Primo accesso admin (PIN provvisorio 0000: cambiarlo subito da Gestione → Operatrici)
