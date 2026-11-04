@@ -14,5 +14,5 @@ Un solo file (`index.html`) + Supabase. Le operatrici registrano quello che fann
 ## Configurazione
 In cima allo `<script>` di `index.html`:
 - `SUPABASE_URL` / `SUPABASE_KEY` — progetto e chiave anon.
-- `INIZIO_SETTIMANA` — 1 = settimana lunedì→domenica.
+- `INIZIO_SETTIMANA` — 4 = settimana aziendale giovedì→mercoledì.
 - `MINUTI_INATTIVITA` — dopo quanti minuti senza tap un'operatrice in turno risulta «ferma».
