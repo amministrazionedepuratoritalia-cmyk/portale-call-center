@@ -241,7 +241,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.2 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.3 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -266,7 +266,6 @@
   <div class="page-content">
     <div id="op-tab-oggi">
       <div id="op-avvisi"></div>
-      <div class="card turno-card" id="op-turno-card"></div>
       <div id="op-riepilogo"></div>
       <div id="op-reg-grid"></div>
       <div id="op-obiettivi"></div>
@@ -375,6 +374,9 @@ const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
 function opDi(id){return operatrici.find(o=>o.id===id)||{id,nome:'?'};}
 function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
+// Attività visibili all'operatrice loggata (l'admin può nasconderne alcune da Gestione → Operatrici)
+function tipiMiei(){const n=currentUser?.tipi_nascosti||[];return tipiAttivi().filter(t=>!n.includes(t.codice));}
+function fontiDi(lista){return [...new Set(lista.filter(t=>t.fonte).map(t=>t.fonte))];}
 // Gruppi di attività: 'contatti' e 'appuntamenti' permettono totali e resa (appuntamenti ogni 100 contatti)
 const GRUPPI={contatti:'Contatti',appuntamenti:'Appuntamenti presi'};
 function codiciGruppo(g){return new Set(tipi.filter(t=>t.gruppo===g).map(t=>t.codice));}
@@ -384,7 +386,7 @@ function metricheGruppi(regs,extra=''){if(!haGruppi())return '';const c=contaGru
 
 // ── Avvio ──
 async function caricaBase(){
-  [tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso&order=nome')]);
+  [tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti&order=nome')]);
   const sel=document.getElementById('login-select');
   sel.innerHTML='<option value="">— seleziona —</option>'+operatrici.filter(o=>o.attiva).map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('');
 }
@@ -410,7 +412,7 @@ async function doLogin(){
   const pin=['p0','p1','p2','p3'].map(id=>document.getElementById(id).value).join('');
   if(pin.length<4){showLoginError('Inserisci il PIN completo');return;}
   try{
-    const res=await api(`cc_operatrici?id=eq.${sel.value}&pin=eq.${encodeURIComponent(pin)}&attiva=eq.true&select=id,nome,ruolo,attiva`);
+    const res=await api(`cc_operatrici?id=eq.${sel.value}&pin=eq.${encodeURIComponent(pin)}&attiva=eq.true&select=id,nome,ruolo,attiva,tipi_nascosti`);
     if(!res.length){showLoginError('PIN errato');['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');document.getElementById('p0').focus();return;}
     document.getElementById('login-error').classList.add('hidden');
     ['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');
@@ -458,9 +460,12 @@ async function loadOggiOp(){
   _giornoOp=oggiIso();
   const [regs,turni]=await Promise.all([
     api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&select=*&order=ora.desc`),
-    api(`cc_turni?operatrice_id=eq.${currentUser.id}&fine=is.null&select=*&order=inizio.desc&limit=1`)
+    api(`cc_turni?operatrice_id=eq.${currentUser.id}&fine=is.null&select=*&order=inizio.desc`)
   ]);
-  regOggi=regs;turnoAperto=turni[0]||null;
+  regOggi=regs;
+  turnoAperto=turni.find(t=>t.data===_giornoOp)||null;
+  const vecchi=turni.filter(t=>t.data!==_giornoOp);if(vecchi.length)chiudiTurniVecchi(vecchi);
+  if(!turnoAperto)await iniziaTurnoOp();
   renderTurnoOp();renderRegGridOp();renderListaOp();
 }
 async function loadAvvisiOp(){
@@ -470,28 +475,24 @@ async function loadAvvisiOp(){
     <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px"><i class="ti ti-speakerphone"></i> Avvisi</div>
     ${avvisi.map(a=>`<div style="font-size:14px;padding:4px 0">${esc(a.testo)} <span class="muted">· ${ddmm(a.created_at.slice(0,10))}</span></div>`).join('')}</div>`:'';
 }
+// Il turno parte da solo al login e si chiude con Esci: l'operatrice non deve premere niente
 function renderTurnoOp(){
-  const card=document.getElementById('op-turno-card'),lbl=document.getElementById('op-turno-lbl');
-  if(turnoAperto){
-    const da=durata(Date.now()-new Date(turnoAperto.inizio));
-    card.innerHTML=`<div class="flex"><span class="turno-dot on"></span><div><div style="font-weight:600">In turno da ${da}</div><div class="muted">Iniziato alle ${hhmm(turnoAperto.inizio)}</div></div></div>
-      <button class="btn btn-sm" onclick="terminaTurnoOp()"><i class="ti ti-player-stop"></i> Termina turno</button>`;
-    lbl.textContent='In turno · '+da;
-  }else{
-    card.innerHTML=`<div class="flex"><span class="turno-dot"></span><div><div style="font-weight:600">Fuori turno</div><div class="muted">Premi quando inizi a lavorare</div></div></div>
-      <button class="btn btn-success btn-sm" onclick="iniziaTurnoOp()"><i class="ti ti-player-play"></i> Inizia turno</button>`;
-    lbl.textContent='Fuori turno';
-  }
+  const lbl=document.getElementById('op-turno-lbl');
+  lbl.innerHTML=turnoAperto?`<span class="turno-dot on" style="display:inline-block;width:7px;height:7px;margin-right:5px;vertical-align:middle"></span>In turno da ${durata(Date.now()-new Date(turnoAperto.inizio))} · dalle ${hhmm(turnoAperto.inizio)}`:'Fuori turno';
 }
 async function iniziaTurnoOp(){
-  try{const r=await api('cc_turni','POST',{operatrice_id:currentUser.id,data:oggiIso(),inizio:new Date().toISOString()});turnoAperto=r[0];renderTurnoOp();toast('Buon lavoro!');}
+  try{const r=await api('cc_turni','POST',{operatrice_id:currentUser.id,data:oggiIso(),inizio:new Date().toISOString()});turnoAperto=r[0];renderTurnoOp();}
   catch(e){toast('Errore: '+e.message);}
 }
-async function terminaTurnoOp(){
-  if(!turnoAperto)return;
-  try{await chiudiTurno(turnoAperto);turnoAperto=null;renderTurnoOp();toast('Turno chiuso');}catch(e){toast('Errore: '+e.message);}
+async function chiudiTurno(t,quando){await api(`cc_turni?id=eq.${t.id}`,'PATCH',{fine:quando||new Date().toISOString()});}
+// Turni rimasti aperti nei giorni scorsi (browser chiuso senza Esci): li chiudo all'ora dell'ultima registrazione di quel giorno
+async function chiudiTurniVecchi(aperti){
+  for(const t of aperti){
+    let fine=t.inizio;
+    try{const u=await api(`cc_registrazioni?operatrice_id=eq.${t.operatrice_id}&data=eq.${t.data}&select=ora&order=ora.desc&limit=1`);if(u[0]&&u[0].ora>t.inizio)fine=u[0].ora;}catch(e){}
+    try{await chiudiTurno(t,fine);}catch(e){}
+  }
 }
-async function chiudiTurno(t){await api(`cc_turni?id=eq.${t.id}`,'PATCH',{fine:new Date().toISOString()});}
 function contaOggi(codice){return regOggi.filter(r=>r.tipo_codice===codice).length;}
 function bottoneTipo(t){return `<button class="reg-btn" id="regbtn-${t.codice}" onclick="registra('${t.codice}')">
       <div class="ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
@@ -505,11 +506,11 @@ function schedaFonte(f,lista){
     ${lista.map(t=>`<div class="fonte-row" id="regbtn-${t.codice}"><div class="lb"><b>${esc(t.gruppo==='contatti'?'Contatti':t.gruppo==='appuntamenti'?'Appuntamenti presi':t.nome)}</b>${t.descrizione?`<span>${esc(t.descrizione)}</span>`:''}</div><div class="cnt">${contaOggi(t.codice)}</div><button class="add fill-${t.colore}" onclick="registra('${t.codice}')">${t.chiede_dettaglio?'+ app.':'+1'}</button></div>`).join('')}</div>`;
 }
 function renderRegGridOp(){
-  const ta=tipiAttivi(),fonti=[...new Set(ta.filter(t=>t.fonte).map(t=>t.fonte))],senza=ta.filter(t=>!t.fonte),gruppi=[...new Set(senza.map(t=>t.gruppo||''))];
+  const ta=tipiMiei(),fonti=[...new Set(ta.filter(t=>t.fonte).map(t=>t.fonte))],senza=ta.filter(t=>!t.fonte),gruppi=[...new Set(senza.map(t=>t.gruppo||''))];
   document.getElementById('op-reg-grid').innerHTML=(fonti.length?`<div class="section-title">Registra per fonte</div><div class="fonte-grid">${fonti.map(f=>schedaFonte(f,ta.filter(t=>t.fonte===f))).join('')}</div>`:'')
     +gruppi.map(g=>`<div class="section-title">${gruppi.length>1||g?(GRUPPI[g]||esc(g)||'Altro'):(fonti.length?'Altro':'Registra')}</div><div class="reg-grid">${senza.filter(t=>(t.gruppo||'')===g).map(bottoneTipo).join('')}</div>`).join('');
   document.getElementById('op-riepilogo').innerHTML=haGruppi()?`<div class="metrics" style="margin-bottom:4px">${metricheGruppi(regOggi)}</div>`:'';
-  const ob=tipiAttivi().filter(t=>t.obiettivo_giorno>0);
+  const ob=tipiMiei().filter(t=>t.obiettivo_giorno>0);
   document.getElementById('op-obiettivi').innerHTML=ob.length?`<div class="section-title">Obiettivi di oggi</div><div class="card">${ob.map(t=>{const n=contaOggi(t.codice),p=Math.min(100,pct(n,t.obiettivo_giorno));return`<div style="padding:6px 0"><div class="flex between"><span style="font-size:14px">${esc(t.nome)}</span><span style="font-size:13px;font-weight:600" class="${n>=t.obiettivo_giorno?'c-green':''}">${n} / ${t.obiettivo_giorno}${n>=t.obiettivo_giorno?' <i class="ti ti-check"></i>':''}</span></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${p}%"></div></div></div>`;}).join('')}</div>`:'';
 }
 function renderListaOp(){
@@ -566,7 +567,7 @@ async function loadStoricoOp(){
   const [regs,turni]=await Promise.all([
     api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=id,tipo_codice,data,ora`),
     api(`cc_turni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=*`)]);
-  const ta=tipiAttivi(),giorni={};
+  const ta=tipiMiei(),giorni={};
   regs.forEach(r=>{(giorni[r.data]=giorni[r.data]||{})[r.tipo_codice]=((giorni[r.data]||{})[r.tipo_codice]||0)+1;});
   const oreG={};turni.forEach(t=>{oreG[t.data]=(oreG[t.data]||0)+(new Date(t.fine||Date.now())-new Date(t.inizio));});
   const tot={};regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
@@ -782,11 +783,11 @@ async function esportaExcel(){
 let _gest='operatrici';
 async function renderGestione(){
   const el=document.getElementById('tab-gestione');
-  try{[tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso&order=nome')]);avvisi=await api('cc_avvisi?select=*&order=created_at.desc');}catch(e){}
+  try{[tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti&order=nome')]);avvisi=await api('cc_avvisi?select=*&order=created_at.desc');}catch(e){}
   let corpo='';
   if(_gest==='operatrici'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">Chi può entrare nel portale. Il PIN lo decidi tu.</span><button class="btn btn-primary btn-sm" onclick="apriOperatrice()"><i class="ti ti-plus"></i> Aggiungi</button></div>
-      <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
+      <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}${o.ruolo!=='admin'?' · vede: '+descriviVisibili(o):''}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
   }else if(_gest==='attivita'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">I pulsanti che vedono le operatrici. La prima è quella base (es. Chiamate).</span><button class="btn btn-primary btn-sm" onclick="apriTipo()"><i class="ti ti-plus"></i> Aggiungi</button></div>
       <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${t.fonte?`<span class="pill bg-gray c-gray">${esc(t.fonte)}</span>`:''}${t.gruppo?`<span class="pill bg-${t.gruppo==='contatti'?'blue':'green'} c-${t.gruppo==='contatti'?'blue':'green'}">${GRUPPI[t.gruppo]||esc(t.gruppo)}</span>`:''}${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
@@ -799,20 +800,33 @@ async function renderGestione(){
   }
   el.innerHTML=`<div class="seg seg-full"><button class="${_gest==='operatrici'?'on':''}" onclick="_gest='operatrici';renderGestione()">Operatrici</button><button class="${_gest==='attivita'?'on':''}" onclick="_gest='attivita';renderGestione()">Attività</button><button class="${_gest==='avvisi'?'on':''}" onclick="_gest='avvisi';renderGestione()">Avvisi</button></div>${corpo}`;
 }
+// Fonti e attività singole (senza fonte) che l'operatrice vede, in base a tipi_nascosti
+function descriviVisibili(o){
+  const n=o.tipi_nascosti||[],ta=tipiAttivi();
+  const fonti=fontiDi(ta).filter(f=>ta.some(t=>t.fonte===f&&!n.includes(t.codice)));
+  const singole=ta.filter(t=>!t.fonte&&!n.includes(t.codice)).map(t=>t.nome);
+  const tutte=[...fonti,...singole];
+  return tutte.length===0?'niente':(n.length===0?'tutto':tutte.join(', '));
+}
 function apriOperatrice(id){
-  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:'operatrice',attiva:true};
+  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:'operatrice',attiva:true,tipi_nascosti:[]};
+  const n=o.tipi_nascosti||[],ta=tipiAttivi();
+  const spunte=fontiDi(ta).map(f=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${ta.filter(t=>t.fonte===f).map(t=>t.codice).join(',')}" ${ta.filter(t=>t.fonte===f).every(t=>n.includes(t.codice))?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(f)}</span></label>`).join('')
+    +ta.filter(t=>!t.fonte).map(t=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${t.codice}" ${n.includes(t.codice)?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(t.nome)}</span></label>`).join('');
   apriModal(`<h2>${id?'Modifica':'Nuova operatrice'}</h2>
     <label>Nome</label><input id="g-nome" value="${esc(o.nome)}" placeholder="Nome e cognome">
     <label>PIN (4 cifre)${id?' — lascia vuoto per non cambiarlo':''}</label><input id="g-pin" inputmode="numeric" maxlength="4" placeholder="••••">
-    <label>Ruolo</label><select id="g-ruolo"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Operatrice</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
+    <label>Ruolo</label><select id="g-ruolo" onchange="document.getElementById('g-vede-box').classList.toggle('hidden',this.value==='admin')"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Operatrice</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="g-attiva" ${o.attiva?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Attiva (può entrare)</span></label>
+    <div id="g-vede-box" ${o.ruolo==='admin'?'class="hidden"':''}><label>Cosa vede e può registrare</label>${spunte||'<div class="muted">Nessuna attività configurata.</div>'}</div>
     <div class="modal-actions">${id?`<button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="eliminaOperatrice(${id})">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaOperatrice(${id||'null'})">Salva</button></div>`);
 }
 async function salvaOperatrice(id){
   const nome=document.getElementById('g-nome').value.trim(),pin=document.getElementById('g-pin').value.trim();
   if(!nome)return toast('Manca il nome');
   if((!id&&!/^\d{4}$/.test(pin))||(pin&&!/^\d{4}$/.test(pin)))return toast('Il PIN deve avere 4 cifre');
-  const body={nome,ruolo:document.getElementById('g-ruolo').value,attiva:document.getElementById('g-attiva').checked};if(pin)body.pin=pin;
+  const nascosti=[...document.querySelectorAll('.g-vede')].filter(c=>!c.checked).flatMap(c=>c.dataset.codici.split(','));
+  const body={nome,ruolo:document.getElementById('g-ruolo').value,attiva:document.getElementById('g-attiva').checked,tipi_nascosti:nascosti};if(pin)body.pin=pin;
   try{if(id)await api(`cc_operatrici?id=eq.${id}`,'PATCH',body);else await api('cc_operatrici','POST',body);chiudiModal();await caricaBase();renderGestione();toast('Salvato');}
   catch(e){toast('Errore: '+e.message);}
 }

@@ -12,6 +12,7 @@ create table if not exists cc_operatrici (
   pin             text        not null,
   ruolo           text        not null default 'operatrice' check (ruolo in ('admin','operatrice')),
   attiva          boolean     not null default true,
+  tipi_nascosti   text[]      not null default '{}',     -- codici di cc_tipi che questa operatrice NON vede
   ultimo_accesso  timestamptz,
   created_at      timestamptz not null default now()
 );
