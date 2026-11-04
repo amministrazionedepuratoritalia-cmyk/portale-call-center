@@ -241,7 +241,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.7 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.8 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -789,11 +789,40 @@ async function renderRegistrazioni(){
   el.innerHTML=`<div class="flex wrap" style="margin-bottom:12px">
       <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le operatrici</option>${operatrici.filter(o=>o.ruolo!=='admin').map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
       <select style="width:auto;flex:1;min-width:140px" onchange="_fTipo=this.value;renderRegistrazioni()"><option value="">Tutte le attività</option>${tipi.map(t=>`<option value="${t.codice}" ${_fTipo===t.codice?'selected':''}>${esc(t.nome)}</option>`).join('')}</select>
-      <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button></div>
+      <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button>
+      <button class="btn btn-primary btn-sm" onclick="apriInserimento()"><i class="ti ti-plus"></i> Inserisci dati passati</button></div>
     <div class="muted" style="padding:0 4px 8px">${regs.length} registrazioni · ${esc(p.label)}</div>
     <div class="card card-flush table-wrap"><table><thead><tr><th>Quando</th><th>Operatrice</th><th>Attività</th><th>Cliente</th><th>Telefono</th><th>Data app.</th><th>Note</th><th></th></tr></thead><tbody>
       ${regs.length?regs.slice(0,500).map(r=>{const t=tipoDi(r.tipo_codice);return`<tr><td class="muted">${labelGiorno(r.data,p.mode==='mese')} ${hhmm(r.ora)}</td><td>${nomeOp(r.operatrice_id)}</td><td><span class="pill bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i> ${esc(t.nome)}</span></td><td>${esc(r.cliente||'')}</td><td>${esc(r.telefono||'')}</td><td>${ddmmyyyy(r.data_appuntamento)}</td><td style="white-space:normal;max-width:260px">${esc(r.note||'')}</td><td><button class="btn btn-icon btn-sm" onclick="modificaReg(${r.id})" title="Modifica"><i class="ti ti-pencil"></i></button> <button class="btn btn-icon btn-sm" onclick="eliminaRegAdmin(${r.id})" title="Elimina"><i class="ti ti-trash"></i></button></td></tr>`;}).join(''):'<tr><td colspan="8" class="empty">Nessuna registrazione.</td></tr>'}
     </tbody></table></div>${regs.length>500?'<div class="muted" style="padding:8px 4px">Mostrate le prime 500: restringi il periodo o usa l\'Excel.</div>':''}`;
+}
+// Inserimento manuale dell'admin: i numeri di un giorno passato per una operatrice (es. la settimana prima del portale)
+function apriInserimento(){
+  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva),ta=tipiAttivi(),fonti=fontiDi(ta);
+  const p=periodoCorrente(),giorno=p.mode==='giorno'?p.start:(p.end<oggiIso()?p.end:oggiIso());
+  const campo=t=>`<div class="flex between" style="padding:6px 0"><span style="font-size:14px">${esc(t.gruppo==='contatti'?'Contatti':t.gruppo==='appuntamenti'?'Appuntamenti presi':t.nome)}</span><input type="number" min="0" class="ins-n" data-codice="${t.codice}" value="0" style="width:90px;text-align:center;padding:8px"></div>`;
+  apriModal(`<h2>Inserisci dati passati</h2><div class="muted">Totali di un giorno per una operatrice. Compaiono nelle statistiche come registrazioni di quel giorno (ore 12:00).</div>
+    <label>Operatrice</label><select id="ins-op">${ops.map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('')}</select>
+    <label>Giorno</label><input type="date" id="ins-data" value="${giorno}" max="${oggiIso()}">
+    <label>Ore di lavoro quel giorno (opzionale)</label><input type="number" id="ins-ore" min="0" step="0.5" placeholder="es. 4">
+    ${fonti.map(f=>`<div class="section-title" style="margin-top:16px">${esc(f)}</div><div class="card" style="padding:6px 14px">${ta.filter(t=>t.fonte===f).map(campo).join('')}</div>`).join('')}
+    ${ta.filter(t=>!t.fonte).length?`<div class="section-title" style="margin-top:16px">Altro</div><div class="card" style="padding:6px 14px">${ta.filter(t=>!t.fonte).map(campo).join('')}</div>`:''}
+    <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" id="ins-salva" onclick="salvaInserimento()"><i class="ti ti-check"></i> Salva</button></div>`);
+}
+async function salvaInserimento(){
+  const op=+document.getElementById('ins-op').value,data=document.getElementById('ins-data').value,oreL=parseFloat(document.getElementById('ins-ore').value)||0;
+  if(!data||data>oggiIso())return toast('Scegli un giorno valido');
+  const p=data.split('-').map(Number),base=new Date(p[0],p[1]-1,p[2],12,0,0);
+  const righe=[];let i=0;
+  document.querySelectorAll('.ins-n').forEach(inp=>{const n=Math.max(0,parseInt(inp.value)||0);for(let k=0;k<n;k++){righe.push({operatrice_id:op,tipo_codice:inp.dataset.codice,data,ora:new Date(base.getTime()+(i++)*1000).toISOString(),note:'inserito dall\'admin'});}});
+  if(!righe.length&&!oreL)return toast('Metti almeno un numero');
+  const btn=document.getElementById('ins-salva');btn.disabled=true;
+  try{
+    if(righe.length)await api('cc_registrazioni','POST',righe);
+    if(oreL>0){const ini=new Date(p[0],p[1]-1,p[2],9,0,0);await api('cc_turni','POST',{operatrice_id:op,data,inizio:ini.toISOString(),fine:new Date(ini.getTime()+oreL*3600000).toISOString()});}
+    chiudiModal();invalidaCache();toast(`Salvate ${righe.length} registrazioni per ${opDi(op).nome}, ${labelGiorno(data)}`);
+    onPeriodoChange();
+  }catch(e){btn.disabled=false;toast('Errore: '+e.message);}
 }
 async function eliminaRegAdmin(id){if(!confirm('Eliminare questa registrazione?'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'DELETE');invalidaCache();renderRegistrazioni();}catch(e){toast('Errore: '+e.message);}}
 function modificaReg(id){
