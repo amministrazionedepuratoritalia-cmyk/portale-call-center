@@ -241,7 +241,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.5 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.6 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -399,9 +399,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   });
   try{
     await caricaBase();
-    // Sessione ricordata su questo dispositivo: rientra senza PIN
-    const saved=localStorage.getItem('cc_user_id');
-    if(saved){const u=operatrici.find(o=>o.id===+saved&&o.attiva);if(u){await entra(u);return;}localStorage.removeItem('cc_user_id');}
+    // Sessione valida solo in questa scheda (sessionStorage): un link aperto altrove chiede il PIN
+    const saved=sessionStorage.getItem('cc_user_id');
+    if(saved){const u=operatrici.find(o=>o.id===+saved&&o.attiva);if(u){await entra(u);return;}sessionStorage.removeItem('cc_user_id');}
   }catch(e){showLoginError('Errore di connessione: '+e.message);}
 });
 
@@ -416,7 +416,7 @@ async function doLogin(){
     if(!res.length){showLoginError('PIN errato');['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');document.getElementById('p0').focus();return;}
     document.getElementById('login-error').classList.add('hidden');
     ['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');
-    localStorage.setItem('cc_user_id',res[0].id);
+    sessionStorage.setItem('cc_user_id',res[0].id);
     await entra(res[0]);
   }catch(e){showLoginError('Errore di connessione. Riprova.');}
 }
@@ -428,7 +428,7 @@ async function entra(u){
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.classList.remove('hidden');}
 async function doLogout(){
   if(turnoAperto){try{await chiudiTurno(turnoAperto);}catch(e){}}
-  localStorage.removeItem('cc_user_id');
+  sessionStorage.removeItem('cc_user_id');
   currentUser=null;turnoAperto=null;regOggi=[];
   clearInterval(_timerTurno);clearInterval(_timerPoll);
   if(_rt){try{_rt.unsubscribe();}catch(e){}_rt=null;}
