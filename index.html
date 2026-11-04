@@ -146,6 +146,20 @@
     .reg-btn .ds { font-size:11px; color:var(--text3); margin-top:2px; padding-right:60px; }
     .reg-btn .cnt { position:absolute; top:12px; right:14px; font-size:24px; font-weight:800; letter-spacing:-1px; color:var(--text); font-variant-numeric:tabular-nums; }
     .reg-btn .plus { position:absolute; bottom:12px; right:14px; font-size:11px; font-weight:600; color:var(--text4); }
+    /* ── SCHEDE PER FONTE (Contatti + Appuntamenti nello stesso riquadro) ── */
+    .fonte-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:14px; }
+    .fonte-card { background:var(--surface); border-radius:16px; box-shadow:var(--sh-xs); padding:12px 14px 6px; }
+    .fonte-head { display:flex; align-items:center; gap:10px; padding-bottom:8px; }
+    .fonte-head .ic { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .fonte-head .nm { font-size:16px; font-weight:700; letter-spacing:-0.3px; flex:1; }
+    .fonte-head .resa { font-size:11px; font-weight:600; color:var(--text3); }
+    .fonte-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:0.5px solid var(--sep); }
+    .fonte-row .lb { flex:1; min-width:0; } .fonte-row .lb b { font-size:14px; display:block; letter-spacing:-0.2px; } .fonte-row .lb span { font-size:11px; color:var(--text3); }
+    .fonte-row .cnt { font-size:24px; font-weight:800; letter-spacing:-1px; min-width:34px; text-align:right; font-variant-numeric:tabular-nums; }
+    .fonte-row .add { border:none; border-radius:50px; padding:9px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; color:#fff; white-space:nowrap; transition:transform .12s; }
+    .fonte-row .add:active { transform:scale(0.94); }
+    .fonte-row.pop .cnt { animation:pop .35s cubic-bezier(.22,1,.36,1); }
+    @media(max-width:500px){ .fonte-grid{ grid-template-columns:1fr; } }
     .turno-card { display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .turno-dot { width:10px; height:10px; border-radius:50%; background:var(--text4); flex-shrink:0; }
     .turno-dot.on { background:var(--green-sys); box-shadow:0 0 0 4px rgba(52,199,89,0.18); animation:pulse 1.6s infinite; }
@@ -227,7 +241,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.1 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.2 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -485,9 +499,15 @@ function bottoneTipo(t){return `<button class="reg-btn" id="regbtn-${t.codice}" 
       <div><div class="nm">${esc(t.nome)}</div>${t.descrizione?`<div class="ds">${esc(t.descrizione)}</div>`:''}</div>
       <div class="plus">${t.chiede_dettaglio?'+ dettagli':'+1'}</div>
     </button>`;}
+function schedaFonte(f,lista){
+  const primo=lista[0],c=lista.filter(t=>t.gruppo==='contatti').reduce((a,t)=>a+contaOggi(t.codice),0),a=lista.filter(t=>t.gruppo==='appuntamenti').reduce((x,t)=>x+contaOggi(t.codice),0);
+  return `<div class="fonte-card"><div class="fonte-head"><div class="ic bg-${primo.colore} c-${primo.colore}"><i class="ti ${primo.icona}"></i></div><div class="nm">${esc(f)}</div>${c?`<div class="resa">resa ${pct(a,c)}%</div>`:''}</div>
+    ${lista.map(t=>`<div class="fonte-row" id="regbtn-${t.codice}"><div class="lb"><b>${esc(t.gruppo==='contatti'?'Contatti':t.gruppo==='appuntamenti'?'Appuntamenti presi':t.nome)}</b>${t.descrizione?`<span>${esc(t.descrizione)}</span>`:''}</div><div class="cnt">${contaOggi(t.codice)}</div><button class="add fill-${t.colore}" onclick="registra('${t.codice}')">${t.chiede_dettaglio?'+ app.':'+1'}</button></div>`).join('')}</div>`;
+}
 function renderRegGridOp(){
-  const ta=tipiAttivi(),gruppi=[...new Set(ta.map(t=>t.gruppo||''))];
-  document.getElementById('op-reg-grid').innerHTML=gruppi.map(g=>`<div class="section-title">${gruppi.length>1||g?(GRUPPI[g]||esc(g)||'Altro'):'Registra'}</div><div class="reg-grid">${ta.filter(t=>(t.gruppo||'')===g).map(bottoneTipo).join('')}</div>`).join('');
+  const ta=tipiAttivi(),fonti=[...new Set(ta.filter(t=>t.fonte).map(t=>t.fonte))],senza=ta.filter(t=>!t.fonte),gruppi=[...new Set(senza.map(t=>t.gruppo||''))];
+  document.getElementById('op-reg-grid').innerHTML=(fonti.length?`<div class="section-title">Registra per fonte</div><div class="fonte-grid">${fonti.map(f=>schedaFonte(f,ta.filter(t=>t.fonte===f))).join('')}</div>`:'')
+    +gruppi.map(g=>`<div class="section-title">${gruppi.length>1||g?(GRUPPI[g]||esc(g)||'Altro'):(fonti.length?'Altro':'Registra')}</div><div class="reg-grid">${senza.filter(t=>(t.gruppo||'')===g).map(bottoneTipo).join('')}</div>`).join('');
   document.getElementById('op-riepilogo').innerHTML=haGruppi()?`<div class="metrics" style="margin-bottom:4px">${metricheGruppi(regOggi)}</div>`:'';
   const ob=tipiAttivi().filter(t=>t.obiettivo_giorno>0);
   document.getElementById('op-obiettivi').innerHTML=ob.length?`<div class="section-title">Obiettivi di oggi</div><div class="card">${ob.map(t=>{const n=contaOggi(t.codice),p=Math.min(100,pct(n,t.obiettivo_giorno));return`<div style="padding:6px 0"><div class="flex between"><span style="font-size:14px">${esc(t.nome)}</span><span style="font-size:13px;font-weight:600" class="${n>=t.obiettivo_giorno?'c-green':''}">${n} / ${t.obiettivo_giorno}${n>=t.obiettivo_giorno?' <i class="ti ti-check"></i>':''}</span></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${p}%"></div></div></div>`;}).join('')}</div>`:'';
@@ -769,7 +789,7 @@ async function renderGestione(){
       <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
   }else if(_gest==='attivita'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">I pulsanti che vedono le operatrici. La prima è quella base (es. Chiamate).</span><button class="btn btn-primary btn-sm" onclick="apriTipo()"><i class="ti ti-plus"></i> Aggiungi</button></div>
-      <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${t.gruppo?`<span class="pill bg-${t.gruppo==='contatti'?'blue':'green'} c-${t.gruppo==='contatti'?'blue':'green'}">${GRUPPI[t.gruppo]||esc(t.gruppo)}</span>`:''}${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
+      <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${t.fonte?`<span class="pill bg-gray c-gray">${esc(t.fonte)}</span>`:''}${t.gruppo?`<span class="pill bg-${t.gruppo==='contatti'?'blue':'green'} c-${t.gruppo==='contatti'?'blue':'green'}">${GRUPPI[t.gruppo]||esc(t.gruppo)}</span>`:''}${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
         <button class="btn btn-icon btn-sm" ${i===0?'disabled':''} onclick="spostaTipo(${t.id},-1)" title="Su"><i class="ti ti-arrow-up"></i></button><button class="btn btn-icon btn-sm" ${i===tipi.length-1?'disabled':''} onclick="spostaTipo(${t.id},1)" title="Giù"><i class="ti ti-arrow-down"></i></button>
         <button class="btn btn-sm" onclick="apriTipo(${t.id})"><i class="ti ti-pencil"></i></button></div>`).join('')}</div>`;
   }else{
@@ -801,13 +821,14 @@ async function eliminaOperatrice(id){
   try{await api(`cc_operatrici?id=eq.${id}`,'DELETE');chiudiModal();await caricaBase();invalidaCache();renderGestione();}catch(e){toast('Errore: '+e.message);}
 }
 function apriTipo(id){
-  const t=id?tipi.find(x=>x.id===id):{codice:'',nome:'',descrizione:'',icona:'ti-phone',colore:'blue',gruppo:'',attivo:true,chiede_dettaglio:false,obiettivo_giorno:0};
+  const t=id?tipi.find(x=>x.id===id):{codice:'',nome:'',descrizione:'',icona:'ti-phone',colore:'blue',gruppo:'',fonte:'',attivo:true,chiede_dettaglio:false,obiettivo_giorno:0};
   const icone=['ti-phone','ti-building-store','ti-world','ti-users','ti-phone-outgoing','ti-phone-incoming','ti-phone-check','ti-phone-x','ti-phone-call','ti-calendar-check','ti-calendar-event','ti-circle-check','ti-mail','ti-message','ti-user-plus','ti-star','ti-thumb-up','ti-thumb-down','ti-clock','ti-flag','ti-coin'];
   apriModal(`<h2>${id?'Modifica attività':'Nuova attività'}</h2>
     <label>Nome del pulsante</label><input id="t-nome" value="${esc(t.nome)}" placeholder="es. Appuntamenti fissati">
     <label>Descrizione breve</label><input id="t-desc" value="${esc(t.descrizione||'')}" placeholder="Quando va premuto">
     <div class="two-col"><div><label>Icona</label><select id="t-icona">${icone.map(i=>`<option value="${i}" ${i===t.icona?'selected':''}>${i.replace('ti-','')}</option>`).join('')}</select></div>
     <div><label>Colore</label><select id="t-colore">${COLORI.map(c=>`<option value="${c}" ${c===t.colore?'selected':''}>${c}</option>`).join('')}</select></div></div>
+    <label>Fonte (le attività con la stessa fonte stanno nella stessa scheda)</label><input id="t-fonte" value="${esc(t.fonte||'')}" placeholder="es. CC, Stand, Internet, Referenze" list="fonti-list"><datalist id="fonti-list">${[...new Set(tipi.filter(x=>x.fonte).map(x=>x.fonte))].map(f=>`<option value="${esc(f)}">`).join('')}</datalist>
     <label>Conta come</label><select id="t-gruppo"><option value="" ${!t.gruppo?'selected':''}>— nessun gruppo —</option><option value="contatti" ${t.gruppo==='contatti'?'selected':''}>Contatto</option><option value="appuntamenti" ${t.gruppo==='appuntamenti'?'selected':''}>Appuntamento preso</option></select>
     <label>Obiettivo giornaliero per operatrice (0 = nessuno)</label><input type="number" id="t-ob" min="0" value="${t.obiettivo_giorno||0}">
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="t-dett" ${t.chiede_dettaglio?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Chiede cliente, telefono, data e note</span></label>
@@ -816,7 +837,7 @@ function apriTipo(id){
 }
 async function salvaTipo(id){
   const v=i=>document.getElementById(i).value.trim();if(!v('t-nome'))return toast('Manca il nome');
-  const body={nome:v('t-nome'),descrizione:v('t-desc')||null,icona:v('t-icona'),colore:v('t-colore'),gruppo:v('t-gruppo')||null,obiettivo_giorno:+v('t-ob')||0,chiede_dettaglio:document.getElementById('t-dett').checked,attivo:document.getElementById('t-attivo').checked};
+  const body={nome:v('t-nome'),descrizione:v('t-desc')||null,icona:v('t-icona'),colore:v('t-colore'),fonte:v('t-fonte')||null,gruppo:v('t-gruppo')||null,obiettivo_giorno:+v('t-ob')||0,chiede_dettaglio:document.getElementById('t-dett').checked,attivo:document.getElementById('t-attivo').checked};
   try{
     if(id)await api(`cc_tipi?id=eq.${id}`,'PATCH',body);
     else{body.codice=v('t-nome').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||('tipo_'+Date.now());body.ordine=(Math.max(0,...tipi.map(t=>t.ordine))+1);await api('cc_tipi','POST',body);}

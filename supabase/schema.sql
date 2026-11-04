@@ -27,6 +27,7 @@ create table if not exists cc_tipi (
   ordine           int         not null default 0,
   attivo           boolean     not null default true,
   gruppo           text,                                  -- 'contatti' | 'appuntamenti' | null (per totali e resa)
+  fonte            text,                                  -- es. 'CC', 'Stand': le attività con la stessa fonte stanno nella stessa scheda
   chiede_dettaglio boolean     not null default false,    -- true = apre la scheda cliente/data/note
   obiettivo_giorno int         not null default 0,        -- 0 = nessun obiettivo
   created_at       timestamptz not null default now()
@@ -91,15 +92,15 @@ drop policy if exists cc_all on cc_turni;         create policy cc_all on cc_tur
 drop policy if exists cc_all on cc_avvisi;        create policy cc_all on cc_avvisi        for all using (true) with check (true);
 
 -- Tipi di partenza (modificabili poi da Gestione → Attività): contatti e appuntamenti presi, per fonte
-insert into cc_tipi (codice, nome, descrizione, icona, colore, ordine, gruppo, chiede_dettaglio, obiettivo_giorno) values
-  ('contatto_cc',        'Contatti CC',        'Contatti dal call center',  'ti-phone',          'blue',   1, 'contatti',     false, 0),
-  ('contatto_stand',     'Contatti Stand',     'Contatti presi allo stand', 'ti-building-store', 'amber',  2, 'contatti',     false, 0),
-  ('contatto_internet',  'Contatti Internet',  'Contatti arrivati dal web', 'ti-world',          'indigo', 3, 'contatti',     false, 0),
-  ('contatto_referenze', 'Contatti Referenze', 'Contatti da referenze',     'ti-users',          'green',  4, 'contatti',     false, 0),
-  ('app_cc',             'App. presi CC',        'Appuntamento da contatto CC',        'ti-calendar-check', 'blue',   5, 'appuntamenti', true, 0),
-  ('app_stand',          'App. presi Stand',     'Appuntamento da contatto Stand',     'ti-calendar-check', 'amber',  6, 'appuntamenti', true, 0),
-  ('app_internet',       'App. presi Internet',  'Appuntamento da contatto Internet',  'ti-calendar-check', 'indigo', 7, 'appuntamenti', true, 0),
-  ('app_referenze',      'App. presi Referenze', 'Appuntamento da contatto Referenze', 'ti-calendar-check', 'green',  8, 'appuntamenti', true, 0)
+insert into cc_tipi (codice, nome, descrizione, icona, colore, ordine, gruppo, fonte, chiede_dettaglio, obiettivo_giorno) values
+  ('contatto_cc',        'Contatti CC',          'Contatti dal call center',           'ti-phone',          'blue',   1, 'contatti',     'CC',        false, 0),
+  ('app_cc',             'App. presi CC',        'Appuntamento da contatto CC',        'ti-calendar-check', 'blue',   2, 'appuntamenti', 'CC',        true,  0),
+  ('contatto_stand',     'Contatti Stand',       'Contatti presi allo stand',          'ti-building-store', 'amber',  3, 'contatti',     'Stand',     false, 0),
+  ('app_stand',          'App. presi Stand',     'Appuntamento da contatto Stand',     'ti-calendar-check', 'amber',  4, 'appuntamenti', 'Stand',     true,  0),
+  ('contatto_internet',  'Contatti Internet',    'Contatti arrivati dal web',          'ti-world',          'indigo', 5, 'contatti',     'Internet',  false, 0),
+  ('app_internet',       'App. presi Internet',  'Appuntamento da contatto Internet',  'ti-calendar-check', 'indigo', 6, 'appuntamenti', 'Internet',  true,  0),
+  ('contatto_referenze', 'Contatti Referenze',   'Contatti da referenze',              'ti-users',          'green',  7, 'contatti',     'Referenze', false, 0),
+  ('app_referenze',      'App. presi Referenze', 'Appuntamento da contatto Referenze', 'ti-calendar-check', 'green',  8, 'appuntamenti', 'Referenze', true,  0)
 on conflict (codice) do nothing;
 
 -- Primo accesso admin (PIN provvisorio 0000: cambiarlo subito da Gestione → Operatrici)
