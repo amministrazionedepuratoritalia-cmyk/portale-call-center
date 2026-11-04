@@ -261,7 +261,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.1 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.2 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -406,7 +406,7 @@ function metricheGruppi(regs,extra=''){if(!haGruppi())return '';const c=contaGru
 
 // ── Avvio ──
 async function caricaBase(){
-  [tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti&order=nome')]);
+  [tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti,squadra&order=nome')]);
   const sel=document.getElementById('login-select');
   sel.innerHTML='<option value="">— seleziona —</option>'+operatrici.filter(o=>o.attiva).map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('');
 }
@@ -670,6 +670,20 @@ async function loadStoricoOp(){
 //  ADMIN
 // ══════════════════════════════════════════════════════════════
 let _periodoMode='giorno';
+let _squadra='';   // '' = tutte le squadre
+function squadre(){return [...new Set(operatrici.filter(o=>o.ruolo!=='admin'&&o.squadra).map(o=>o.squadra))].sort();}
+function inSquadra(id){return !_squadra||opDi(id).squadra===_squadra;}
+function filtraSquadra(d){return _squadra?{regs:d.regs.filter(r=>inSquadra(r.operatrice_id)),turni:d.turni.filter(t=>inSquadra(t.operatrice_id))}:d;}
+function setSquadra(q){_squadra=q;onPeriodoChange();}
+// Selettore «Tutte · Mattino · Pomeriggio» (compare solo se almeno una operatrice ha una squadra)
+function barraSquadre(){const sq=squadre();if(!sq.length)return'';return `<div class="seg seg-full"><button class="${!_squadra?'on':''}" onclick="setSquadra('')">Tutte le squadre</button>${sq.map(q=>`<button class="${_squadra===q?'on':''}" onclick="setSquadra('${esc(q)}')">${esc(q)}</button>`).join('')}</div>`;}
+function etichettaSquadra(){return _squadra?' · squadra '+esc(_squadra):'';}
+// Con «Tutte»: un riquadro per squadra, cliccabile, per vederle una accanto all'altra
+function confrontoSquadre(regs){
+  const sq=squadre();if(_squadra||sq.length<2||!haGruppi())return'';
+  const senza=regs.filter(r=>!opDi(r.operatrice_id).squadra);
+  return `<div class="section-title">Squadre a confronto</div><div class="metrics">${sq.map(q=>{const mie=regs.filter(r=>opDi(r.operatrice_id).squadra===q);return `<div class="metric fonte-tile" style="cursor:pointer;border-top:3px solid var(--indigo)" onclick="setSquadra('${esc(q)}')" title="Vedi solo ${esc(q)}"><div class="lbl" style="font-size:12px;color:var(--text)">${esc(q)}</div><div class="stats">${statHtml(contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),true)}</div></div>`;}).join('')}${senza.length?`<div class="metric fonte-tile" style="border-top:3px solid var(--text4)"><div class="lbl" style="font-size:12px">Senza squadra</div><div class="stats">${statHtml(contaGruppo(senza,'contatti'),contaGruppo(senza,'appuntamenti'),true)}</div></div>`:''}</div>`;
+}
 const _cache={};   // chiave start|end → {regs,turni}
 function generaMesi(){const now=new Date(),out=[];let y=now.getFullYear(),m=now.getMonth()+1;while(y>ANNO_INIZIO_DATI||(y===ANNO_INIZIO_DATI&&m>=MESE_INIZIO_DATI)){out.push(`${y}-${String(m).padStart(2,'0')}`);m--;if(m<1){m=12;y--;}}return out.length?out:[yyyymm(now)];}
 function generaSettimane(){const out=[],limite=`${ANNO_INIZIO_DATI}-${String(MESE_INIZIO_DATI).padStart(2,'0')}-01`;let s=inizioSettimanaDi(oggiIso());while(isoAddDays(s,6)>=limite&&out.length<400){out.push(s);s=isoAddDays(s,-7);}return out.length?out:[inizioSettimanaDi(oggiIso())];}
@@ -730,8 +744,8 @@ function nomeOp(id){return esc(opDi(id).nome);}
 async function renderLive(evidenzia){
   const el=document.getElementById('tab-live');
   const oggi=oggiIso(),p={start:oggi,end:oggi};
-  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva);
+  let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva&&inSquadra(o.id));
   const aperti=d.turni.filter(t=>!t.fine);
   const ultimaDi={};d.regs.forEach(r=>{if(!ultimaDi[r.operatrice_id]||r.ora>ultimaDi[r.operatrice_id])ultimaDi[r.operatrice_id]=r.ora;});
   const stato=o=>{const t=aperti.find(x=>x.operatrice_id===o.id);if(!t)return{cls:'gray',txt:'fuori turno',turno:null};const u=ultimaDi[o.id];const fermaDa=u?(Date.now()-new Date(u))/60000:(Date.now()-new Date(t.inizio))/60000;return fermaDa>MINUTI_INATTIVITA?{cls:'amber',txt:'ferma da '+Math.round(fermaDa)+' min',turno:t}:{cls:'green',txt:'attiva',turno:t};};
@@ -739,12 +753,13 @@ async function renderLive(evidenzia){
   const app=id=>contaGruppo(regsDi[id]||[],'appuntamenti'),con=id=>contaGruppo(regsDi[id]||[],'contatti');
   // Prima chi è in turno, poi per appuntamenti e contatti di oggi
   ops.sort((a,b)=>(stato(b).turno?1:0)-(stato(a).turno?1:0)||app(b.id)-app(a.id)||con(b.id)-con(a.id));
-  el.innerHTML=`
-    <div class="section-title">In linea adesso · ${labelGiornoLungo(oggi)}</div>
+  el.innerHTML=`${barraSquadre()}
+    <div class="section-title">In linea adesso · ${labelGiornoLungo(oggi)}${etichettaSquadra()}</div>
     <div class="online-chips" style="margin-bottom:14px">${aperti.length?aperti.map(t=>{const o=opDi(t.operatrice_id),s=stato(o);return`<span class="chip"><span class="avatar sm">${iniziali(o.nome)}</span><span><b>${esc(o.nome)}</b> <span class="st">dalle ${hhmm(t.inizio)} · ${durata(Date.now()-new Date(t.inizio))}</span></span><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span><button class="btn btn-xs" title="Chiudi il turno (se ha dimenticato)" onclick="chiudiTurnoAdmin(${t.id})"><i class="ti ti-player-stop"></i></button></span>`;}).join(''):'<span class="muted">Nessuna operatrice in turno.</span>'}</div>
     <div class="section-title">Oggi, tutte insieme</div>
     ${G?`<div class="metrics">${metricheGruppi(d.regs)}</div>`:''}
     <div class="metrics">${tileFonti(d.regs,cols)||ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${d.regs.filter(r=>r.tipo_codice===t.codice).length}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
+    ${confrontoSquadre(d.regs)}
     <div class="section-title">Oggi, operatrice per operatrice</div>
     <div class="op-grid">${ops.map(o=>{const s=stato(o);return cardOperatrice(o,regsDi[o.id]||[],{badge:`<span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span>`,sub:s.turno?`In turno dalle ${hhmm(s.turno.inizio)}${ultimaDi[o.id]?' · ultima registrazione '+hhmm(ultimaDi[o.id]):''}`:(ultimaDi[o.id]?'Ultima registrazione '+hhmm(ultimaDi[o.id]):'Oggi non è ancora entrata'),vuoto:'Ancora niente oggi'});}).join('')}</div>
     <div class="section-title">Ultime registrazioni</div>
@@ -763,9 +778,9 @@ async function chiudiTurnoAdmin(id){if(!confirm('Chiudere questo turno adesso?')
 async function renderOperatrici(){
   const el=document.getElementById('tab-operatrici'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
-  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi();
-  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
+  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
   const regsDi={};d.regs.forEach(r=>(regsDi[r.operatrice_id]=regsDi[r.operatrice_id]||[]).push(r));
   const oreOp={},giorniOp={};
   d.regs.forEach(r=>(giorniOp[r.operatrice_id]=giorniOp[r.operatrice_id]||new Set()).add(r.data));
@@ -774,9 +789,10 @@ async function renderOperatrici(){
   // Classifica: prima chi ha preso più appuntamenti, a parità chi ha fatto più contatti
   const app=id=>G?contaGruppo(regsDi[id]||[],'appuntamenti'):(regsDi[id]||[]).length,con=id=>contaGruppo(regsDi[id]||[],'contatti');
   ops.sort((a,b)=>app(b.id)-app(a.id)||con(b.id)-con(a.id)||a.nome.localeCompare(b.nome));
-  el.innerHTML=`<div class="section-title">${esc(p.label)} · tutte insieme</div>
+  el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()} · tutte insieme</div>
     <div class="metrics">${metricheGruppi(d.regs)}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
     <div class="metrics">${tileFonti(d.regs,cols)||ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${d.regs.filter(r=>r.tipo_codice===t.codice).length}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}</div>
+    ${confrontoSquadre(d.regs)}
     <div class="section-title">Classifica operatrici${G?' · per appuntamenti presi':''}</div>
     <div class="op-grid">${ops.map((o,i)=>{const g=giorniOp[o.id]?.size||0,h=oreOp[o.id]||0;return cardOperatrice(o,regsDi[o.id]||[],{rank:(regsDi[o.id]||[]).length?i+1:0,sub:[g?g+(g===1?' giorno lavorato':' giorni lavorati'):'',h?ore(h)+' ore in turno':''].filter(Boolean).join(' · ')||'Nessun dato in questo periodo'});}).join('')}</div>
     <div class="muted" style="padding:0 4px 8px">Resa = appuntamenti presi ogni 100 contatti.</div>`;
@@ -787,7 +803,7 @@ let _metricaAnd=null;
 async function renderAndamento(){
   const el=document.getElementById('tab-andamento'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
-  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const ta=tipiAttivi(),G=haGruppi();
   const opzioni=(G?[{codice:'g:contatti',nome:'Tutti i contatti',colore:'blue'},{codice:'g:appuntamenti',nome:'Tutti gli appuntamenti',colore:'green'}]:[]).concat(ta);
   if(!_metricaAnd||!opzioni.some(t=>t.codice===_metricaAnd))_metricaAnd=opzioni[0]?.codice;
@@ -810,7 +826,7 @@ async function renderAndamento(){
     const lista=Object.entries(perOp).sort((a,b)=>b[1]-a[1]),maxO=Math.max(1,...lista.map(x=>x[1]));
     blocco=`<div class="section-title">${esc(t.nome)} per operatrice</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
   }
-  el.innerHTML=`<div class="section-title">${esc(p.label)}</div>
+  el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()}</div>
     <div class="seg seg-full" style="flex-wrap:wrap">${opzioni.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
     ${blocco}
     <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card"><div class="chart">${perOra.slice(h0,h1+1).map((v,i)=>`<div class="col"><div class="v">${v||''}</div><div class="b fill-${t.colore}" style="height:${pct(v,maxOra)}%"></div><div class="l">${h0+i}</div></div>`).join('')}</div></div>`;
@@ -821,10 +837,10 @@ let _fOp='',_fTipo='';
 async function renderRegistrazioni(){
   const el=document.getElementById('tab-registrazioni'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
-  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo));
-  el.innerHTML=`<div class="flex wrap" style="margin-bottom:12px">
-      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le operatrici</option>${operatrici.filter(o=>o.ruolo!=='admin').map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
+  el.innerHTML=`${barraSquadre()}<div class="flex wrap" style="margin-bottom:12px">
+      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le operatrici</option>${operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
       <select style="width:auto;flex:1;min-width:140px" onchange="_fTipo=this.value;renderRegistrazioni()"><option value="">Tutte le attività</option>${tipi.map(t=>`<option value="${t.codice}" ${_fTipo===t.codice?'selected':''}>${esc(t.nome)}</option>`).join('')}</select>
       <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button>
       <button class="btn btn-primary btn-sm" onclick="apriInserimento()"><i class="ti ti-plus"></i> Inserisci dati passati</button></div>
@@ -878,14 +894,14 @@ async function salvaModificaReg(id){
   catch(e){toast('Errore: '+e.message);}
 }
 async function esportaExcel(){
-  const p=periodoCorrente(),d=await datiPeriodo(p);
+  const p=periodoCorrente(),d=filtraSquadra(await datiPeriodo(p));
   const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo)).slice().reverse();
   const ta=tipiAttivi(),q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
   const righe=[['Data','Ora','Operatrice','Attività','Cliente','Telefono','Data appuntamento','Note'].map(q).join(';')];
   regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),r.note].map(q).join(';')));
   const G=haGruppi();
-  righe.push('');righe.push(['Riepilogo per operatrice',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %']:[]),'Ore in turno'].map(q).join(';'));
-  operatrici.filter(o=>o.ruolo!=='admin').forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti'))]:[]),ore(h)].map(q).join(';'));});
+  righe.push('');righe.push(['Riepilogo per operatrice','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %']:[]),'Ore in turno'].map(q).join(';'));
+  operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti'))]:[]),ore(h)].map(q).join(';'));});
   const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`call-center-${p.start}${p.end!==p.start?'_'+p.end:''}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
@@ -894,11 +910,11 @@ async function esportaExcel(){
 let _gest='operatrici';
 async function renderGestione(){
   const el=document.getElementById('tab-gestione');
-  try{[tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti&order=nome')]);avvisi=await api('cc_avvisi?select=*&order=created_at.desc');}catch(e){}
+  try{[tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti,squadra&order=nome')]);avvisi=await api('cc_avvisi?select=*&order=created_at.desc');}catch(e){}
   let corpo='';
   if(_gest==='operatrici'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">Chi può entrare nel portale. Il PIN lo decidi tu.</span><button class="btn btn-primary btn-sm" onclick="apriOperatrice()"><i class="ti ti-plus"></i> Aggiungi</button></div>
-      <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}${o.ruolo!=='admin'?' · vede: '+descriviVisibili(o):''}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
+      <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.squadra?`<span class="pill bg-indigo c-indigo">${esc(o.squadra)}</span>`:''}${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}${o.ruolo!=='admin'?' · vede: '+descriviVisibili(o):''}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
   }else if(_gest==='attivita'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">I pulsanti che vedono le operatrici. La prima è quella base (es. Chiamate).</span><button class="btn btn-primary btn-sm" onclick="apriTipo()"><i class="ti ti-plus"></i> Aggiungi</button></div>
       <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${t.fonte?`<span class="pill bg-gray c-gray">${esc(t.fonte)}</span>`:''}${t.gruppo?`<span class="pill bg-${t.gruppo==='contatti'?'blue':'green'} c-${t.gruppo==='contatti'?'blue':'green'}">${GRUPPI[t.gruppo]||esc(t.gruppo)}</span>`:''}${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
@@ -920,7 +936,8 @@ function descriviVisibili(o){
   return tutte.length===0?'niente':(n.length===0?'tutto':tutte.join(', '));
 }
 function apriOperatrice(id){
-  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:'operatrice',attiva:true,tipi_nascosti:[]};
+  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:'operatrice',attiva:true,tipi_nascosti:[],squadra:''};
+  const sqOpzioni=[...new Set(['Mattino','Pomeriggio',...squadre()])];
   const n=o.tipi_nascosti||[],ta=tipiAttivi();
   const spunte=fontiDi(ta).map(f=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${ta.filter(t=>t.fonte===f).map(t=>t.codice).join(',')}" ${ta.filter(t=>t.fonte===f).every(t=>n.includes(t.codice))?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(f)}</span></label>`).join('')
     +ta.filter(t=>!t.fonte).map(t=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${t.codice}" ${n.includes(t.codice)?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(t.nome)}</span></label>`).join('');
@@ -928,6 +945,7 @@ function apriOperatrice(id){
     <label>Nome</label><input id="g-nome" value="${esc(o.nome)}" placeholder="Nome e cognome">
     <label>PIN (4 cifre)${id?' — lascia vuoto per non cambiarlo':''}</label><input id="g-pin" inputmode="numeric" maxlength="4" placeholder="••••">
     <label>Ruolo</label><select id="g-ruolo" onchange="document.getElementById('g-vede-box').classList.toggle('hidden',this.value==='admin')"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Operatrice</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
+    <label>Squadra</label><input id="g-squadra" value="${esc(o.squadra||'')}" placeholder="es. Mattino o Pomeriggio" list="squadre-list"><datalist id="squadre-list">${sqOpzioni.map(q=>`<option value="${esc(q)}">`).join('')}</datalist>
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="g-attiva" ${o.attiva?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Attiva (può entrare)</span></label>
     <div id="g-vede-box" ${o.ruolo==='admin'?'class="hidden"':''}><label>Cosa vede e può registrare</label>${spunte||'<div class="muted">Nessuna attività configurata.</div>'}</div>
     <div class="modal-actions">${id?`<button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="eliminaOperatrice(${id})">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaOperatrice(${id||'null'})">Salva</button></div>`);
@@ -937,7 +955,7 @@ async function salvaOperatrice(id){
   if(!nome)return toast('Manca il nome');
   if((!id&&!/^\d{4}$/.test(pin))||(pin&&!/^\d{4}$/.test(pin)))return toast('Il PIN deve avere 4 cifre');
   const nascosti=[...document.querySelectorAll('.g-vede')].filter(c=>!c.checked).flatMap(c=>c.dataset.codici.split(','));
-  const body={nome,ruolo:document.getElementById('g-ruolo').value,attiva:document.getElementById('g-attiva').checked,tipi_nascosti:nascosti};if(pin)body.pin=pin;
+  const body={nome,ruolo:document.getElementById('g-ruolo').value,attiva:document.getElementById('g-attiva').checked,tipi_nascosti:nascosti,squadra:document.getElementById('g-squadra').value.trim()||null};if(pin)body.pin=pin;
   try{if(id)await api(`cc_operatrici?id=eq.${id}`,'PATCH',body);else await api('cc_operatrici','POST',body);chiudiModal();await caricaBase();renderGestione();toast('Salvato');}
   catch(e){toast('Errore: '+e.message);}
 }

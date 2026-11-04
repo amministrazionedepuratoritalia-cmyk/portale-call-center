@@ -13,6 +13,7 @@ create table if not exists cc_operatrici (
   ruolo           text        not null default 'operatrice' check (ruolo in ('admin','operatrice')),
   attiva          boolean     not null default true,
   tipi_nascosti   text[]      not null default '{}',     -- codici di cc_tipi che questa operatrice NON vede
+  squadra         text,                                  -- es. 'Mattino' / 'Pomeriggio': l'admin può vederle separate
   ultimo_accesso  timestamptz,
   created_at      timestamptz not null default now()
 );
