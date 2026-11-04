@@ -1,0 +1,18 @@
+# Portale Call Center — Depuratoritalia
+
+Un solo file (`index.html`) + Supabase. Le operatrici registrano quello che fanno con un tap, l'admin vede tutto in tempo reale.
+
+## Come funziona
+- **Operatrice**: entra con nome + PIN → *Inizia turno* → preme i pulsanti (Chiamate, Appuntamenti…). Ogni tap è salvato subito. In *Storico* vede il suo mese.
+- **Admin**: *Adesso* (chi è in linea, totali di oggi, ultime registrazioni, aggiornamento live), *Operatrici* (confronto per periodo), *Andamento* (grafici per giorno e per ora), *Registrazioni* (elenco, modifica, Excel), *Gestione* (operatrici e PIN, pulsanti/attività, avvisi).
+
+## Prima messa in funzione
+1. Supabase → SQL Editor → incollare ed eseguire `supabase/schema.sql` (crea le tabelle `cc_*`, il realtime e un utente **Admin** con PIN `0000`).
+2. Aprire il portale, entrare come Admin → *Gestione* → cambiare il PIN admin e aggiungere le operatrici.
+3. Pubblicare: GitHub Pages → Settings → Pages → branch `main`, cartella `/`.
+
+## Configurazione
+In cima allo `<script>` di `index.html`:
+- `SUPABASE_URL` / `SUPABASE_KEY` — progetto e chiave anon.
+- `INIZIO_SETTIMANA` — 1 = settimana lunedì→domenica.
+- `MINUTI_INATTIVITA` — dopo quanti minuti senza tap un'operatrice in turno risulta «ferma».

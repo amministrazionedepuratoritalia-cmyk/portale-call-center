@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Portale Call Center — Depuratoritalia</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#F2F2F7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Call Center">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg:#F2F2F7; --surface:#FFFFFF; --surface2:#F2F2F7; --surface3:#E5E5EA;
+      --text:#000; --text2:#3C3C43; --text3:#8E8E93; --text4:#C7C7CC;
+      --border:rgba(0,0,0,0.08); --sep:rgba(0,0,0,0.08);
+      --blue:#0071E3; --blue-dark:#0051A8; --blue-bg:#EBF3FF;
+      --green:#1D8348; --green-sys:#34C759; --green-bg:#E8F8EF;
+      --amber:#B25000; --amber-bg:#FFF3E0;
+      --red:#CC1B1B; --red-sys:#FF3B30; --red-bg:#FFF0F0;
+      --pink:#C0185A; --pink-bg:#FFF0F5;
+      --purple:#7B2FBE; --purple-bg:#F5EEFF;
+      --indigo:#5E5CE6; --indigo-bg:#EDEDFD;
+      --gray:#636366; --gray-bg:#E5E5EA;
+      --r:10px; --r-lg:13px; --r-xl:16px;
+      --sh-xs:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+      --sh-sm:0 2px 8px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.04);
+      --sh-md:0 4px 16px rgba(0,0,0,0.10),0 2px 6px rgba(0,0,0,0.04);
+      --sh-lg:0 8px 30px rgba(0,0,0,0.14),0 3px 8px rgba(0,0,0,0.06);
+    }
+    body { font-family:-apple-system,'SF Pro Text','Helvetica Neue','Inter',sans-serif; font-size:15px; line-height:1.4; color:var(--text); background:var(--bg); min-height:100vh; -webkit-font-smoothing:antialiased; }
+    .screen { display:none; min-height:100vh; }
+    .screen.active { display:block; }
+
+    /* ── TOPBAR / TABS ── */
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:0 20px; height:52px; background:rgba(242,242,247,0.92); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px); border-bottom:0.5px solid rgba(0,0,0,0.12); position:sticky; top:0; z-index:100; gap:10px; }
+    .topbar h1 { font-size:16px; font-weight:600; letter-spacing:-0.3px; }
+    .nav-tabs { display:flex; padding:0 16px; background:rgba(242,242,247,0.92); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px); border-bottom:0.5px solid rgba(0,0,0,0.12); overflow-x:auto; scrollbar-width:none; position:sticky; top:52px; z-index:99; }
+    .nav-tabs::-webkit-scrollbar { display:none; }
+    #screen-admin .nav-tabs { top:104px; }
+    .tab { padding:10px 14px; font-size:13px; cursor:pointer; border-bottom:1.5px solid transparent; color:var(--text3); white-space:nowrap; display:flex; align-items:center; gap:5px; transition:color .15s,border-color .15s; }
+    .tab:hover { color:var(--text2); }
+    .tab.active { color:var(--blue); border-bottom-color:var(--blue); font-weight:600; }
+    .subbar { display:flex; align-items:center; gap:8px; padding:8px 16px; height:52px; background:rgba(242,242,247,0.92); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px); border-bottom:0.5px solid rgba(0,0,0,0.12); position:sticky; top:52px; z-index:99; }
+    .subbar select, .subbar input[type=date] { padding:8px 10px; font-size:14px; width:auto; min-width:150px; flex:1; max-width:320px; }
+    .page-content { padding:16px; max-width:1100px; margin:0 auto; }
+    .section-title { font-size:12px; font-weight:600; letter-spacing:0.3px; text-transform:uppercase; color:var(--text3); margin:16px 0 8px; padding-left:4px; }
+    .section-title:first-child { margin-top:0; }
+
+    /* ── CARDS / METRICS ── */
+    .card { background:var(--surface); border-radius:13px; padding:14px 16px; box-shadow:var(--sh-xs); margin-bottom:10px; }
+    .card-flush { padding:0; overflow:hidden; }
+    .metric { background:var(--surface); border-radius:13px; padding:14px 12px; text-align:center; box-shadow:var(--sh-xs); position:relative; }
+    .metric .val { font-size:26px; font-weight:700; letter-spacing:-1px; line-height:1; margin-bottom:4px; }
+    .metric .lbl { font-size:10px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--text3); }
+    .metric .sub { font-size:10px; color:var(--text3); margin-top:3px; }
+    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; margin-bottom:12px; }
+
+    /* ── FORMS / BUTTONS ── */
+    label { font-size:12px; font-weight:600; letter-spacing:0.2px; color:var(--text3); display:block; margin:14px 0 5px; }
+    input, select, textarea { width:100%; padding:11px 14px; border:0.5px solid rgba(0,0,0,0.12); border-radius:var(--r); background:var(--surface); color:var(--text); font-size:15px; font-family:inherit; -webkit-appearance:none; appearance:none; outline:none; transition:border-color .15s,box-shadow .15s; }
+    input:focus, select:focus, textarea:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(0,113,227,0.12); }
+    input[type=checkbox] { width:18px; height:18px; -webkit-appearance:checkbox; appearance:checkbox; padding:0; }
+    select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%23C7C7CC' d='M5 6 0 0h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; }
+    .btn { padding:10px 18px; border:0.5px solid rgba(0,0,0,0.12); border-radius:50px; background:var(--surface); color:var(--text2); font-size:14px; cursor:pointer; font-family:inherit; transition:all .14s; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; letter-spacing:-0.2px; }
+    .btn:hover { background:var(--surface2); }
+    .btn:active { transform:scale(0.97); opacity:.85; }
+    .btn:disabled { opacity:.5; cursor:default; }
+    .btn-primary { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:600; box-shadow:0 2px 8px rgba(0,113,227,0.25); }
+    .btn-primary:hover { background:var(--blue-dark); }
+    .btn-success { background:var(--green); color:#fff; border-color:var(--green); font-weight:600; }
+    .btn-success:hover { background:#166035; }
+    .btn-danger { background:var(--red); color:#fff; border-color:var(--red); font-weight:600; }
+    .btn-danger:hover { background:#a01515; }
+    .btn-ghost { background:transparent; border-color:transparent; color:var(--blue); padding:8px 12px; }
+    .btn-ghost:hover { background:var(--blue-bg); }
+    .btn-sm { padding:7px 14px; font-size:12px; }
+    .btn-xs { padding:4px 10px; font-size:11px; }
+    .btn-full { width:100%; justify-content:center; padding:15px 20px; font-size:17px; font-weight:600; border-radius:13px; }
+    .btn-icon { width:32px; height:32px; padding:0; justify-content:center; border-radius:50%; }
+    .nav-arrow { width:36px; height:36px; border-radius:50%; border:0.5px solid rgba(0,0,0,0.12); background:#fff; color:var(--text2); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; flex-shrink:0; }
+    .nav-arrow:disabled { opacity:.35; cursor:default; }
+    .seg { display:inline-flex; background:var(--surface3); border-radius:9px; padding:2px; flex-shrink:0; }
+    .seg button { border:none; background:transparent; padding:7px 12px; border-radius:7px; font-size:13px; font-weight:500; color:var(--text2); cursor:pointer; font-family:inherit; }
+    .seg button.on { background:#fff; color:var(--text); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,0.10); }
+    .seg-full { display:flex; margin-bottom:14px; } .seg-full button { flex:1; }
+
+    /* ── PILLS / BADGES ── */
+    .pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:3px 9px; border-radius:50px; white-space:nowrap; }
+    .c-blue{color:var(--blue)} .bg-blue{background:var(--blue-bg)} .c-green{color:var(--green)} .bg-green{background:var(--green-bg)}
+    .c-amber{color:var(--amber)} .bg-amber{background:var(--amber-bg)} .c-red{color:var(--red)} .bg-red{background:var(--red-bg)}
+    .c-pink{color:var(--pink)} .bg-pink{background:var(--pink-bg)} .c-purple{color:var(--purple)} .bg-purple{background:var(--purple-bg)}
+    .c-indigo{color:var(--indigo)} .bg-indigo{background:var(--indigo-bg)} .c-gray{color:var(--gray)} .bg-gray{background:var(--gray-bg)}
+    .fill-blue{background:var(--blue)} .fill-green{background:var(--green-sys)} .fill-amber{background:#FF9500} .fill-red{background:var(--red-sys)}
+    .fill-pink{background:#FF2D55} .fill-purple{background:#AF52DE} .fill-indigo{background:var(--indigo)} .fill-gray{background:var(--text3)}
+    .alert { padding:12px 14px; border-radius:var(--r); font-size:13px; margin-bottom:12px; font-weight:500; }
+    .alert-danger { background:var(--red-bg); color:var(--red); }
+    .alert-info { background:var(--blue-bg); color:var(--blue-dark); }
+
+    /* ── ROWS ── */
+    .row { display:flex; align-items:center; padding:11px 16px; gap:12px; background:var(--surface); position:relative; }
+    .row::after { content:''; position:absolute; bottom:0; left:58px; right:0; height:0.5px; background:var(--sep); }
+    .row:last-child::after { display:none; }
+    .row-ic { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+    .row-body { flex:1; min-width:0; }
+    .row-title { font-size:15px; letter-spacing:-0.2px; overflow:hidden; text-overflow:ellipsis; }
+    .row-sub { font-size:12px; color:var(--text3); margin-top:1px; }
+    .row-time { font-size:12px; color:var(--text3); font-variant-numeric:tabular-nums; }
+    .avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),#34AADC); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
+    .avatar.sm { width:26px; height:26px; font-size:10px; }
+
+    /* ── TABLES ── */
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { text-align:left; font-size:10px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--text3); padding:8px 10px; border-bottom:0.5px solid rgba(0,0,0,0.12); white-space:nowrap; }
+    td { padding:9px 10px; border-bottom:0.5px solid var(--sep); vertical-align:middle; white-space:nowrap; }
+    tr:last-child td { border-bottom:none; }
+    td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+    tr.tot td { font-weight:700; background:var(--surface2); }
+    .bar-wrap { background:var(--surface2); border-radius:4px; height:6px; overflow:hidden; margin-top:6px; }
+    .bar { height:100%; border-radius:4px; transition:width .5s cubic-bezier(.22,1,.36,1); }
+
+    /* ── LOGIN ── */
+    .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .login-inner { width:100%; max-width:380px; animation:fadeUp .32s cubic-bezier(.22,1,.36,1) both; }
+    .login-logo-wrap { text-align:center; margin-bottom:28px; }
+    .login-logo-wrap img { max-width:200px; height:auto; }
+    .login-title { font-size:26px; font-weight:700; letter-spacing:-.6px; margin-top:14px; }
+    .login-sub { font-size:15px; color:var(--text3); margin-top:4px; }
+    .login-card { background:var(--surface); border-radius:18px; padding:28px 24px 24px; box-shadow:var(--sh-md); }
+    .pin-input { display:flex; gap:12px; justify-content:center; margin:20px 0; }
+    .pin-digit { width:58px; height:68px; text-align:center; font-size:30px; font-weight:600; border-radius:13px; padding:0; }
+
+    /* ── BOTTONI REGISTRAZIONE (operatrice) ── */
+    .reg-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+    .reg-btn { background:var(--surface); border:none; border-radius:16px; padding:16px 14px 14px; box-shadow:var(--sh-xs); cursor:pointer; text-align:left; font-family:inherit; position:relative; transition:transform .12s, box-shadow .12s; min-height:118px; display:flex; flex-direction:column; justify-content:space-between; }
+    .reg-btn:hover { box-shadow:var(--sh-sm); }
+    .reg-btn:active { transform:scale(0.96); }
+    .reg-btn.pop { animation:pop .35s cubic-bezier(.22,1,.36,1); }
+    @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.05)} 100%{transform:scale(1)} }
+    .reg-btn .ic { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+    .reg-btn .nm { font-size:14px; font-weight:600; letter-spacing:-0.2px; margin-top:10px; color:var(--text); line-height:1.2; }
+    .reg-btn .ds { font-size:11px; color:var(--text3); margin-top:2px; padding-right:60px; }
+    .reg-btn .cnt { position:absolute; top:12px; right:14px; font-size:24px; font-weight:800; letter-spacing:-1px; color:var(--text); font-variant-numeric:tabular-nums; }
+    .reg-btn .plus { position:absolute; bottom:12px; right:14px; font-size:11px; font-weight:600; color:var(--text4); }
+    .turno-card { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .turno-dot { width:10px; height:10px; border-radius:50%; background:var(--text4); flex-shrink:0; }
+    .turno-dot.on { background:var(--green-sys); box-shadow:0 0 0 4px rgba(52,199,89,0.18); animation:pulse 1.6s infinite; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(52,199,89,0.35)} 70%{box-shadow:0 0 0 8px rgba(52,199,89,0)} 100%{box-shadow:0 0 0 0 rgba(52,199,89,0)} }
+
+    /* ── LIVE (admin) ── */
+    .live-badge { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; padding:4px 10px; border-radius:50px; background:var(--gray-bg); color:var(--text3); }
+    .live-badge i.dot { width:7px; height:7px; border-radius:50%; background:var(--text4); }
+    .live-badge.on { background:var(--green-bg); color:var(--green); }
+    .live-badge.on i.dot { background:var(--green-sys); animation:pulse 1.6s infinite; }
+    .online-chips { display:flex; flex-wrap:wrap; gap:8px; }
+    .chip { display:inline-flex; align-items:center; gap:8px; background:var(--surface); border-radius:50px; padding:6px 12px 6px 6px; box-shadow:var(--sh-xs); font-size:13px; }
+    .chip .st { font-size:11px; color:var(--text3); }
+    .feed .row.new { animation:flash 1.6s ease-out; }
+    @keyframes flash { 0%{background:var(--blue-bg)} 100%{background:var(--surface)} }
+    .empty { text-align:center; color:var(--text3); font-size:13px; padding:28px 12px; }
+
+    /* ── GRAFICI CSS ── */
+    .chart { display:flex; align-items:flex-end; gap:4px; height:160px; padding:8px 4px 0; }
+    .chart .col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; min-width:0; }
+    .chart .col .v { font-size:10px; font-weight:600; color:var(--text2); margin-bottom:3px; font-variant-numeric:tabular-nums; }
+    .chart .col .b { width:100%; max-width:34px; border-radius:5px 5px 2px 2px; min-height:2px; transition:height .4s; }
+    .chart .col .l { font-size:10px; color:var(--text3); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .chart .col.today .l { color:var(--blue); font-weight:700; }
+    .chart .col.off { opacity:.45; }
+
+    /* ── MODAL / TOAST ── */
+    .modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.30); display:flex; align-items:flex-end; justify-content:center; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); animation:fadeOverlay .2s ease both; }
+    @keyframes fadeOverlay { from{opacity:0} to{opacity:1} }
+    @media(min-width:600px){ .modal-overlay{ align-items:center; padding:20px; } }
+    .modal { background:var(--surface); border-radius:20px 20px 0 0; padding:12px 24px 36px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:var(--sh-lg); animation:slideUp .26s cubic-bezier(.32,.72,0,1) both; }
+    @media(min-width:600px){ .modal{ border-radius:16px; padding:28px; } }
+    @keyframes slideUp { from{transform:translateY(60px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .modal-grab { width:36px; height:4px; border-radius:2px; background:var(--surface3); margin:0 auto 20px; }
+    @media(min-width:600px){ .modal-grab{ display:none; } }
+    .modal h2 { font-size:19px; font-weight:700; margin-bottom:6px; letter-spacing:-.4px; }
+    .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:22px; flex-wrap:wrap; }
+    #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:rgba(28,28,30,0.94); color:#fff; padding:12px 18px; border-radius:50px; font-size:14px; display:flex; align-items:center; gap:12px; box-shadow:var(--sh-lg); opacity:0; pointer-events:none; transition:all .25s; z-index:400; max-width:calc(100% - 32px); }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+    #toast button { background:transparent; border:none; color:#5AC8FA; font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; }
+    .hidden { display:none !important; }
+    .loading { display:flex; align-items:center; justify-content:center; padding:3rem; color:var(--text3); font-size:14px; }
+    .spinner { width:20px; height:20px; border:2px solid var(--surface3); border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; margin-right:10px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .screen.active .page-content > * { animation:fadeUp .24s cubic-bezier(.22,1,.36,1) both; }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .flex { display:flex; align-items:center; gap:8px; } .between { justify-content:space-between; } .wrap { flex-wrap:wrap; }
+    .muted { color:var(--text3); font-size:12px; }
+    @media(max-width:700px){ .two-col{ grid-template-columns:1fr; } .hide-mobile{ display:none; } }
+    @media(max-width:560px){ .nav-arrow{ display:none; } .subbar select, .subbar input[type=date]{ font-size:16px; min-width:0; } }
+    @media(max-width:500px){
+      .topbar{ padding:0 14px; height:48px; } .nav-tabs{ top:48px; } .subbar{ top:48px; } #screen-admin .nav-tabs{ top:100px; }
+      .page-content{ padding:12px; } .tab{ padding:9px 10px; font-size:12px; } input,select,textarea{ font-size:16px; }
+      .reg-grid{ grid-template-columns:1fr 1fr; gap:8px; } .reg-btn{ min-height:110px; padding:14px 12px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="screen-login" class="screen active">
+  <div class="login-screen">
+    <div class="login-inner">
+      <div class="login-logo-wrap">
+        <img src="logo.webp" alt="Depuratoritalia">
+        <div class="login-title">Call Center</div>
+        <div class="login-sub">Seleziona il tuo nome e inserisci il PIN</div>
+      </div>
+      <div class="login-card">
+        <div id="login-error" class="alert alert-danger hidden"></div>
+        <label style="margin-top:0">Chi sei?</label>
+        <select id="login-select"><option value="">— seleziona —</option></select>
+        <label style="margin-top:18px">PIN (4 cifre)</label>
+        <div class="pin-input">
+          <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p0">
+          <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p1">
+          <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p2">
+          <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v1.0 — Depuratoritalia</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OPERATRICE ═══ -->
+<div id="screen-op" class="screen">
+  <div class="topbar">
+    <div class="flex" style="min-width:0">
+      <div class="avatar" id="op-avatar">--</div>
+      <div style="min-width:0">
+        <div id="op-name" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Operatrice</div>
+        <div id="op-turno-lbl" class="muted" style="font-size:11px">Fuori turno</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> Esci</button>
+  </div>
+  <div class="nav-tabs">
+    <div class="tab active" onclick="switchTab(this,'op-tab-oggi')"><i class="ti ti-headset"></i> Oggi</div>
+    <div class="tab" onclick="switchTab(this,'op-tab-storico');loadStoricoOp()"><i class="ti ti-history"></i> Storico</div>
+  </div>
+  <div class="page-content">
+    <div id="op-tab-oggi">
+      <div id="op-avvisi"></div>
+      <div class="card turno-card" id="op-turno-card"></div>
+      <div class="section-title">Registra</div>
+      <div class="reg-grid" id="op-reg-grid"></div>
+      <div id="op-obiettivi"></div>
+      <div class="section-title">Oggi, in ordine di tempo</div>
+      <div class="card card-flush" id="op-lista"></div>
+    </div>
+    <div id="op-tab-storico" class="hidden">
+      <div class="flex" style="margin-bottom:12px"><select id="op-storico-mese" onchange="loadStoricoOp()"></select></div>
+      <div id="op-storico"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADMIN ═══ -->
+<div id="screen-admin" class="screen">
+  <div class="topbar">
+    <div class="flex" style="min-width:0">
+      <h1 style="white-space:nowrap">Call Center</h1>
+      <span class="live-badge" id="live-badge"><i class="dot"></i><span>Live</span></span>
+    </div>
+    <div class="flex">
+      <span class="muted hide-mobile" id="admin-name"></span>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> Esci</button>
+    </div>
+  </div>
+  <div class="subbar" id="admin-subbar">
+    <div class="seg" id="periodo-seg">
+      <button class="on" data-mode="giorno" onclick="setPeriodoMode('giorno')">Giorno</button>
+      <button data-mode="sett" onclick="setPeriodoMode('sett')">Settimana</button>
+      <button data-mode="mese" onclick="setPeriodoMode('mese')">Mese</button>
+    </div>
+    <button class="nav-arrow" id="periodo-prev" onclick="spostaPeriodo(-1)" title="Precedente"><i class="ti ti-chevron-left"></i></button>
+    <input type="date" id="admin-giorno" onchange="onPeriodoChange()">
+    <select id="admin-sett" class="hidden" onchange="onPeriodoChange()"></select>
+    <select id="admin-mese" class="hidden" onchange="onPeriodoChange()"></select>
+    <button class="nav-arrow" id="periodo-next" onclick="spostaPeriodo(1)" title="Successivo"><i class="ti ti-chevron-right"></i></button>
+  </div>
+  <div class="nav-tabs">
+    <div class="tab active" onclick="switchTab(this,'tab-live');renderLive()"><i class="ti ti-broadcast"></i> Adesso</div>
+    <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Operatrici</div>
+    <div class="tab" onclick="switchTab(this,'tab-andamento');renderAndamento()"><i class="ti ti-chart-bar"></i> Andamento</div>
+    <div class="tab" onclick="switchTab(this,'tab-registrazioni');renderRegistrazioni()"><i class="ti ti-list"></i> Registrazioni</div>
+    <div class="tab" onclick="switchTab(this,'tab-gestione');renderGestione()"><i class="ti ti-settings"></i> Gestione</div>
+  </div>
+  <div class="page-content">
+    <div id="tab-live"><div class="loading"><div class="spinner"></div>Carico…</div></div>
+    <div id="tab-operatrici" class="hidden"></div>
+    <div id="tab-andamento" class="hidden"></div>
+    <div id="tab-registrazioni" class="hidden"></div>
+    <div id="tab-gestione" class="hidden"></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIGURAZIONE — per cambiare progetto Supabase basta cambiare queste due righe
+// ══════════════════════════════════════════════════════════════
+const SUPABASE_URL='https://nhpmsgllgxjqzyynjbwf.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ocG1zZ2xsZ3hqcXp5eW5qYndmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NDY4MjksImV4cCI6MjA5NTUyMjgyOX0.C7FBRoApJnbJQ-D0LxlapNlO-dIF37fT_jYVcdzC8wY';
+const ANNO_INIZIO_DATI=2026, MESE_INIZIO_DATI=11;   // da quando esistono dati: i menu mese partono da qui
+const INIZIO_SETTIMANA=1;                            // 1 = lunedì → domenica (settimana del call center)
+const MINUTI_INATTIVITA=10;                          // dopo quanti minuti senza registrazioni una operatrice in turno risulta "ferma"
+
+// ── Utilità date ──
+const GIORNI_BREVI=['dom','lun','mar','mer','gio','ven','sab'], MESI_BREVI=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+function yyyymm(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function yyyymmdd(d){return yyyymm(d)+'-'+String(d.getDate()).padStart(2,'0');}
+function oggiIso(){return yyyymmdd(new Date());}
+function isoToDate(iso){const p=iso.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
+function isoAddDays(iso,n){const p=iso.split('-').map(Number);return yyyymmdd(new Date(p[0],p[1]-1,p[2]+n));}
+function meseRange(m){const p=m.split('-').map(Number);return{start:m+'-01',end:yyyymmdd(new Date(p[0],p[1],0))};}
+function inizioSettimanaDi(iso){const wd=isoToDate(iso).getDay();return isoAddDays(iso,-((wd-INIZIO_SETTIMANA+7)%7));}
+function labelGiorno(iso,conMese=true){const d=isoToDate(iso);return GIORNI_BREVI[d.getDay()]+' '+d.getDate()+(conMese?' '+MESI_BREVI[d.getMonth()]:'');}
+function labelGiornoLungo(iso){const d=isoToDate(iso);return d.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase());}
+function labelSettimana(start){const end=isoAddDays(start,6),ps=start.split('-').map(Number),pe=end.split('-').map(Number);return ps[1]===pe[1]?`${ps[2]} – ${pe[2]} ${MESI_BREVI[pe[1]-1]} ${pe[0]}`:`${ps[2]} ${MESI_BREVI[ps[1]-1]} – ${pe[2]} ${MESI_BREVI[pe[1]-1]} ${pe[0]}`;}
+function labelMese(m){const p=m.split('-').map(Number);return new Date(p[0],p[1]-1,1).toLocaleDateString('it-IT',{month:'long',year:'numeric'}).replace(/^./,c=>c.toUpperCase());}
+function hhmm(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function ddmm(iso){return iso?iso.split('-').reverse().slice(0,2).join('/'):'';}
+function ddmmyyyy(iso){return iso?iso.split('-').reverse().join('/'):'';}
+function durata(ms){const m=Math.max(0,Math.round(ms/60000));const h=Math.floor(m/60);return h?`${h}h ${String(m%60).padStart(2,'0')}m`:`${m} min`;}
+function ore(ms){return (ms/3600000).toFixed(1).replace('.',',');}
+function fa(ts){const m=Math.round((Date.now()-new Date(ts))/60000);if(m<1)return'adesso';if(m<60)return m+' min fa';const h=Math.floor(m/60);return h<24?h+' h fa':Math.floor(h/24)+' g fa';}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function iniziali(n){return n.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();}
+function pct(a,b){return b?Math.round(a/b*100):0;}
+
+// ── API Supabase (REST con chiave anon, come nel Portale Tecnici) ──
+async function api(path,method='GET',body=null){
+  const opts={method,headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':method==='PATCH'?'return=representation':''}};
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,opts);
+  if(!res.ok)throw new Error(await res.text());
+  const t=await res.text();return t?JSON.parse(t):[];
+}
+
+// ── Stato ──
+let currentUser=null, tipi=[], operatrici=[], avvisi=[];
+let turnoAperto=null;          // turno in corso dell'operatrice loggata
+let regOggi=[];                // registrazioni di oggi dell'operatrice loggata
+let _timerTurno=null, _timerPoll=null, _rt=null, _rtOk=false;
+const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
+function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
+function opDi(id){return operatrici.find(o=>o.id===id)||{id,nome:'?'};}
+function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
+
+// ── Avvio ──
+async function caricaBase(){
+  [tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso&order=nome')]);
+  const sel=document.getElementById('login-select');
+  sel.innerHTML='<option value="">— seleziona —</option>'+operatrici.filter(o=>o.attiva).map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('');
+}
+document.addEventListener('DOMContentLoaded',async()=>{
+  // PIN: passa alla casella successiva da solo, Invio = Entra
+  ['p0','p1','p2','p3'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.addEventListener('input',()=>{el.value=el.value.replace(/\D/g,'').slice(-1);if(el.value&&i<3)document.getElementById('p'+(i+1)).focus();if(el.value&&i===3)doLogin();});
+    el.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!el.value&&i>0)document.getElementById('p'+(i-1)).focus();if(e.key==='Enter')doLogin();});
+  });
+  try{
+    await caricaBase();
+    // Sessione ricordata su questo dispositivo: rientra senza PIN
+    const saved=localStorage.getItem('cc_user_id');
+    if(saved){const u=operatrici.find(o=>o.id===+saved&&o.attiva);if(u){await entra(u);return;}localStorage.removeItem('cc_user_id');}
+  }catch(e){showLoginError('Errore di connessione: '+e.message);}
+});
+
+// ── Login / logout ──
+async function doLogin(){
+  const sel=document.getElementById('login-select');
+  if(!sel.value){showLoginError('Seleziona il tuo nome');return;}
+  const pin=['p0','p1','p2','p3'].map(id=>document.getElementById(id).value).join('');
+  if(pin.length<4){showLoginError('Inserisci il PIN completo');return;}
+  try{
+    const res=await api(`cc_operatrici?id=eq.${sel.value}&pin=eq.${encodeURIComponent(pin)}&attiva=eq.true&select=id,nome,ruolo,attiva`);
+    if(!res.length){showLoginError('PIN errato');['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');document.getElementById('p0').focus();return;}
+    document.getElementById('login-error').classList.add('hidden');
+    ['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');
+    localStorage.setItem('cc_user_id',res[0].id);
+    await entra(res[0]);
+  }catch(e){showLoginError('Errore di connessione. Riprova.');}
+}
+async function entra(u){
+  currentUser=u;
+  api(`cc_operatrici?id=eq.${u.id}`,'PATCH',{ultimo_accesso:new Date().toISOString()}).catch(()=>{});
+  if(u.ruolo==='admin'){await avviaAdmin();}else{await avviaOperatrice();}
+}
+function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.classList.remove('hidden');}
+async function doLogout(){
+  if(turnoAperto){try{await chiudiTurno(turnoAperto);}catch(e){}}
+  localStorage.removeItem('cc_user_id');
+  currentUser=null;turnoAperto=null;regOggi=[];
+  clearInterval(_timerTurno);clearInterval(_timerPoll);
+  if(_rt){try{_rt.unsubscribe();}catch(e){}_rt=null;}
+  document.getElementById('login-select').value='';
+  showScreen('login');
+}
+function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active');window.scrollTo(0,0);}
+function resetTabs(screen){const t=document.querySelector('#screen-'+screen+' .nav-tabs .tab');if(t)switchTab(t,screen==='op'?'op-tab-oggi':'tab-live');}
+function switchTab(el,id){
+  const screen=el.closest('.screen');
+  screen.querySelectorAll('.nav-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  screen.querySelectorAll('.page-content > div').forEach(d=>d.classList.toggle('hidden',d.id!==id));
+}
+
+// ══════════════════════════════════════════════════════════════
+//  OPERATRICE
+// ══════════════════════════════════════════════════════════════
+async function avviaOperatrice(){
+  document.getElementById('op-avatar').textContent=iniziali(currentUser.nome);
+  document.getElementById('op-name').textContent=currentUser.nome;
+  popolaMesi('op-storico-mese');
+  resetTabs('op');showScreen('op');
+  await Promise.all([loadOggiOp(),loadAvvisiOp()]);
+  clearInterval(_timerTurno);_timerTurno=setInterval(renderTurnoOp,30000);
+  clearInterval(_timerPoll);_timerPoll=setInterval(()=>{loadAvvisiOp();if(oggiIso()!==_giornoOp)loadOggiOp();},120000);
+}
+let _giornoOp=null;
+async function loadOggiOp(){
+  _giornoOp=oggiIso();
+  const [regs,turni]=await Promise.all([
+    api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&select=*&order=ora.desc`),
+    api(`cc_turni?operatrice_id=eq.${currentUser.id}&fine=is.null&select=*&order=inizio.desc&limit=1`)
+  ]);
+  regOggi=regs;turnoAperto=turni[0]||null;
+  renderTurnoOp();renderRegGridOp();renderListaOp();
+}
+async function loadAvvisiOp(){
+  try{avvisi=await api('cc_avvisi?attivo=eq.true&select=*&order=created_at.desc');}catch(e){return;}
+  const box=document.getElementById('op-avvisi');
+  box.innerHTML=avvisi.length?`<div class="card" style="border-left:4px solid var(--amber);padding:10px 14px">
+    <div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px"><i class="ti ti-speakerphone"></i> Avvisi</div>
+    ${avvisi.map(a=>`<div style="font-size:14px;padding:4px 0">${esc(a.testo)} <span class="muted">· ${ddmm(a.created_at.slice(0,10))}</span></div>`).join('')}</div>`:'';
+}
+function renderTurnoOp(){
+  const card=document.getElementById('op-turno-card'),lbl=document.getElementById('op-turno-lbl');
+  if(turnoAperto){
+    const da=durata(Date.now()-new Date(turnoAperto.inizio));
+    card.innerHTML=`<div class="flex"><span class="turno-dot on"></span><div><div style="font-weight:600">In turno da ${da}</div><div class="muted">Iniziato alle ${hhmm(turnoAperto.inizio)}</div></div></div>
+      <button class="btn btn-sm" onclick="terminaTurnoOp()"><i class="ti ti-player-stop"></i> Termina turno</button>`;
+    lbl.textContent='In turno · '+da;
+  }else{
+    card.innerHTML=`<div class="flex"><span class="turno-dot"></span><div><div style="font-weight:600">Fuori turno</div><div class="muted">Premi quando inizi a lavorare</div></div></div>
+      <button class="btn btn-success btn-sm" onclick="iniziaTurnoOp()"><i class="ti ti-player-play"></i> Inizia turno</button>`;
+    lbl.textContent='Fuori turno';
+  }
+}
+async function iniziaTurnoOp(){
+  try{const r=await api('cc_turni','POST',{operatrice_id:currentUser.id,data:oggiIso(),inizio:new Date().toISOString()});turnoAperto=r[0];renderTurnoOp();toast('Buon lavoro!');}
+  catch(e){toast('Errore: '+e.message);}
+}
+async function terminaTurnoOp(){
+  if(!turnoAperto)return;
+  try{await chiudiTurno(turnoAperto);turnoAperto=null;renderTurnoOp();toast('Turno chiuso');}catch(e){toast('Errore: '+e.message);}
+}
+async function chiudiTurno(t){await api(`cc_turni?id=eq.${t.id}`,'PATCH',{fine:new Date().toISOString()});}
+function contaOggi(codice){return regOggi.filter(r=>r.tipo_codice===codice).length;}
+function renderRegGridOp(){
+  const grid=document.getElementById('op-reg-grid');
+  grid.innerHTML=tipiAttivi().map(t=>`<button class="reg-btn" id="regbtn-${t.codice}" onclick="registra('${t.codice}')">
+      <div class="ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
+      <div class="cnt">${contaOggi(t.codice)}</div>
+      <div><div class="nm">${esc(t.nome)}</div>${t.descrizione?`<div class="ds">${esc(t.descrizione)}</div>`:''}</div>
+      <div class="plus">${t.chiede_dettaglio?'+ dettagli':'+1'}</div>
+    </button>`).join('');
+  const ob=tipiAttivi().filter(t=>t.obiettivo_giorno>0);
+  document.getElementById('op-obiettivi').innerHTML=ob.length?`<div class="section-title">Obiettivi di oggi</div><div class="card">${ob.map(t=>{const n=contaOggi(t.codice),p=Math.min(100,pct(n,t.obiettivo_giorno));return`<div style="padding:6px 0"><div class="flex between"><span style="font-size:14px">${esc(t.nome)}</span><span style="font-size:13px;font-weight:600" class="${n>=t.obiettivo_giorno?'c-green':''}">${n} / ${t.obiettivo_giorno}${n>=t.obiettivo_giorno?' <i class="ti ti-check"></i>':''}</span></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${p}%"></div></div></div>`;}).join('')}</div>`:'';
+}
+function renderListaOp(){
+  const el=document.getElementById('op-lista');
+  if(!regOggi.length){el.innerHTML='<div class="empty">Ancora niente oggi. Quando inizi, premi i pulsanti qui sopra.</div>';return;}
+  el.innerHTML=regOggi.map(r=>{const t=tipoDi(r.tipo_codice);return`<div class="row" id="reg-${r.id}">
+      <div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
+      <div class="row-body"><div class="row-title">${esc(t.nome)}${r.cliente?` · <b>${esc(r.cliente)}</b>`:''}</div>
+        <div class="row-sub">${[r.telefono,r.data_appuntamento?'app. '+ddmmyyyy(r.data_appuntamento):'',r.note].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div>
+      <span class="row-time">${hhmm(r.ora)}</span>
+      <button class="btn btn-icon btn-sm" title="Elimina" onclick="eliminaRegOp(${r.id})"><i class="ti ti-x"></i></button>
+    </div>`;}).join('');
+}
+async function registra(codice){
+  const t=tipoDi(codice);
+  if(t.chiede_dettaglio){apriDettaglio(t);return;}
+  await salvaRegistrazione({tipo_codice:codice});
+}
+async function salvaRegistrazione(extra){
+  const body={operatrice_id:currentUser.id,data:oggiIso(),ora:new Date().toISOString(),...extra};
+  try{
+    const r=await api('cc_registrazioni','POST',body);
+    regOggi.unshift(r[0]);
+    renderRegGridOp();renderListaOp();
+    const b=document.getElementById('regbtn-'+extra.tipo_codice);if(b){b.classList.remove('pop');void b.offsetWidth;b.classList.add('pop');}
+    toast(`${tipoDi(extra.tipo_codice).nome} registrato`,{label:'Annulla',fn:()=>eliminaRegOp(r[0].id,true)});
+    return true;
+  }catch(e){toast('Errore, non salvato: '+e.message);return false;}
+}
+async function eliminaRegOp(id,silenzioso){
+  if(!silenzioso&&!confirm('Eliminare questa registrazione?'))return;
+  try{await api(`cc_registrazioni?id=eq.${id}&operatrice_id=eq.${currentUser.id}`,'DELETE');regOggi=regOggi.filter(r=>r.id!==id);renderRegGridOp();renderListaOp();if(silenzioso)toast('Annullato');}
+  catch(e){toast('Errore: '+e.message);}
+}
+function apriDettaglio(t){
+  const isApp=/app|conferm/i.test(t.codice+t.nome);
+  apriModal(`<h2>${esc(t.nome)}</h2><div class="muted">Compila quello che sai, il resto puoi lasciarlo vuoto.</div>
+    <label>Cliente</label><input id="d-cliente" placeholder="Nome e cognome" autocomplete="off">
+    <label>Telefono</label><input id="d-telefono" inputmode="tel" placeholder="Numero">
+    <label>${isApp?'Data appuntamento':'Data (richiamo / appuntamento)'}</label><input type="date" id="d-dataapp">
+    <label>Note</label><textarea id="d-note" rows="2" placeholder="Zona, orario, cosa ha detto…"></textarea>
+    <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaDettaglio('${t.codice}')"><i class="ti ti-check"></i> Registra</button></div>`);
+  setTimeout(()=>document.getElementById('d-cliente')?.focus(),250);
+}
+async function salvaDettaglio(codice){
+  const v=id=>document.getElementById(id).value.trim();
+  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,note:v('d-note')||null});
+  if(ok)chiudiModal();
+}
+async function loadStoricoOp(){
+  const mese=document.getElementById('op-storico-mese').value,el=document.getElementById('op-storico');
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  const {start,end}=meseRange(mese);
+  const [regs,turni]=await Promise.all([
+    api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=id,tipo_codice,data,ora`),
+    api(`cc_turni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=*`)]);
+  const ta=tipiAttivi(),giorni={};
+  regs.forEach(r=>{(giorni[r.data]=giorni[r.data]||{})[r.tipo_codice]=((giorni[r.data]||{})[r.tipo_codice]||0)+1;});
+  const oreG={};turni.forEach(t=>{oreG[t.data]=(oreG[t.data]||0)+(new Date(t.fine||Date.now())-new Date(t.inizio));});
+  const tot={};regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
+  const totOre=Object.values(oreG).reduce((a,b)=>a+b,0);
+  const giorniOrd=Object.keys(Object.assign({},giorni,oreG)).sort().reverse();
+  el.innerHTML=`<div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}<div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
+    ${giorniOrd.length?`<div class="card card-flush table-wrap"><table><thead><tr><th>Giorno</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}<th class="num">Ore</th></tr></thead><tbody>
+    ${giorniOrd.map(g=>`<tr><td>${labelGiorno(g)}</td>${ta.map(t=>`<td class="num">${giorni[g]?.[t.codice]||''}</td>`).join('')}<td class="num">${oreG[g]?ore(oreG[g]):''}</td></tr>`).join('')}
+    <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}<td class="num">${ore(totOre)}</td></tr></tbody></table></div>`:'<div class="empty">Nessuna registrazione in questo mese.</div>'}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ADMIN
+// ══════════════════════════════════════════════════════════════
+let _periodoMode='giorno';
+const _cache={};   // chiave start|end → {regs,turni}
+function generaMesi(){const now=new Date(),out=[];let y=now.getFullYear(),m=now.getMonth()+1;while(y>ANNO_INIZIO_DATI||(y===ANNO_INIZIO_DATI&&m>=MESE_INIZIO_DATI)){out.push(`${y}-${String(m).padStart(2,'0')}`);m--;if(m<1){m=12;y--;}}return out.length?out:[yyyymm(now)];}
+function generaSettimane(){const out=[],limite=`${ANNO_INIZIO_DATI}-${String(MESE_INIZIO_DATI).padStart(2,'0')}-01`;let s=inizioSettimanaDi(oggiIso());while(isoAddDays(s,6)>=limite&&out.length<400){out.push(s);s=isoAddDays(s,-7);}return out.length?out:[inizioSettimanaDi(oggiIso())];}
+function popolaMesi(id){const el=document.getElementById(id);const cur=el.value;el.innerHTML=generaMesi().map(m=>`<option value="${m}">${labelMese(m)}</option>`).join('');if(cur&&[...el.options].some(o=>o.value===cur))el.value=cur;}
+function popolaSettimane(){const el=document.getElementById('admin-sett');const cur=el.value,corr=inizioSettimanaDi(oggiIso());el.innerHTML=generaSettimane().map(s=>`<option value="${s}">${labelSettimana(s)}${s===corr?' · in corso':''}</option>`).join('');if(cur&&[...el.options].some(o=>o.value===cur))el.value=cur;}
+function periodoCorrente(){
+  if(_periodoMode==='giorno'){const g=document.getElementById('admin-giorno').value||oggiIso();return{start:g,end:g,label:labelGiornoLungo(g),mode:'giorno'};}
+  if(_periodoMode==='sett'){const s=document.getElementById('admin-sett').value||inizioSettimanaDi(oggiIso());return{start:s,end:isoAddDays(s,6),label:'Settimana '+labelSettimana(s),mode:'sett'};}
+  const m=document.getElementById('admin-mese').value||yyyymm(new Date());return{...meseRange(m),label:labelMese(m),mode:'mese'};
+}
+function setPeriodoMode(mode){
+  _periodoMode=mode;
+  document.querySelectorAll('#periodo-seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));
+  document.getElementById('admin-giorno').classList.toggle('hidden',mode!=='giorno');
+  document.getElementById('admin-sett').classList.toggle('hidden',mode!=='sett');
+  document.getElementById('admin-mese').classList.toggle('hidden',mode!=='mese');
+  onPeriodoChange();
+}
+function spostaPeriodo(dir){
+  if(_periodoMode==='giorno'){const el=document.getElementById('admin-giorno');const n=isoAddDays(el.value||oggiIso(),dir);if(n>oggiIso())return;el.value=n;}
+  else{const sel=document.getElementById(_periodoMode==='sett'?'admin-sett':'admin-mese');const i=sel.selectedIndex-dir;if(i<0||i>=sel.options.length)return;sel.selectedIndex=i;}
+  onPeriodoChange();
+}
+function aggiornaFrecce(){
+  const prev=document.getElementById('periodo-prev'),next=document.getElementById('periodo-next');
+  if(_periodoMode==='giorno'){next.disabled=(document.getElementById('admin-giorno').value||oggiIso())>=oggiIso();prev.disabled=false;}
+  else{const sel=document.getElementById(_periodoMode==='sett'?'admin-sett':'admin-mese');prev.disabled=sel.selectedIndex>=sel.options.length-1;next.disabled=sel.selectedIndex<=0;}
+}
+function tabAttivo(){return document.querySelector('#screen-admin .page-content > div:not(.hidden)')?.id;}
+function onPeriodoChange(){
+  aggiornaFrecce();
+  const f={'tab-live':renderLive,'tab-operatrici':renderOperatrici,'tab-andamento':renderAndamento,'tab-registrazioni':renderRegistrazioni}[tabAttivo()];
+  if(f)f();
+}
+async function datiPeriodo(p){
+  const k=p.start+'|'+p.end;
+  if(_cache[k])return _cache[k];
+  const [regs,turni]=await Promise.all([
+    api(`cc_registrazioni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=ora.desc`),
+    api(`cc_turni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=inizio.desc`)]);
+  return _cache[k]={regs,turni};
+}
+function invalidaCache(){Object.keys(_cache).forEach(k=>delete _cache[k]);}
+async function avviaAdmin(){
+  document.getElementById('admin-name').textContent=currentUser.nome;
+  document.getElementById('admin-giorno').value=oggiIso();document.getElementById('admin-giorno').max=oggiIso();
+  popolaMesi('admin-mese');popolaSettimane();aggiornaFrecce();
+  resetTabs('admin');showScreen('admin');
+  invalidaCache();
+  await renderLive();
+  avviaRealtime();
+  clearInterval(_timerPoll);_timerPoll=setInterval(()=>{if(!_rtOk){invalidaCache();onPeriodoChange();}},30000);
+}
+function nomeOp(id){return esc(opDi(id).nome);}
+
+// ── ADESSO (sempre oggi, in tempo reale) ──
+async function renderLive(evidenzia){
+  const el=document.getElementById('tab-live');
+  const oggi=oggiIso(),p={start:oggi,end:oggi};
+  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const ta=tipiAttivi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva);
+  const aperti=d.turni.filter(t=>!t.fine);
+  const ultimaDi={};d.regs.forEach(r=>{if(!ultimaDi[r.operatrice_id]||r.ora>ultimaDi[r.operatrice_id])ultimaDi[r.operatrice_id]=r.ora;});
+  const tot={};d.regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
+  const perOp={};d.regs.forEach(r=>{(perOp[r.operatrice_id]=perOp[r.operatrice_id]||{})[r.tipo_codice]=(perOp[r.operatrice_id]?.[r.tipo_codice]||0)+1;});
+  const stato=o=>{const t=aperti.find(x=>x.operatrice_id===o.id);if(!t)return{cls:'gray',txt:'fuori turno'};const u=ultimaDi[o.id];const fermaDa=u?(Date.now()-new Date(u))/60000:(Date.now()-new Date(t.inizio))/60000;return fermaDa>MINUTI_INATTIVITA?{cls:'amber',txt:'ferma da '+Math.round(fermaDa)+' min'}:{cls:'green',txt:'attiva'};};
+  const chiamate=ta[0];
+  el.innerHTML=`
+    <div class="section-title">In linea adesso · ${labelGiornoLungo(oggi)}</div>
+    <div class="online-chips" style="margin-bottom:14px">${aperti.length?aperti.map(t=>{const o=opDi(t.operatrice_id),s=stato(o);return`<span class="chip"><span class="avatar sm">${iniziali(o.nome)}</span><span><b>${esc(o.nome)}</b> <span class="st">dalle ${hhmm(t.inizio)} · ${durata(Date.now()-new Date(t.inizio))}</span></span><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span><button class="btn btn-xs" title="Chiudi il turno (se ha dimenticato)" onclick="chiudiTurnoAdmin(${t.id})"><i class="ti ti-player-stop"></i></button></span>`;}).join(''):'<span class="muted">Nessuna operatrice in turno.</span>'}</div>
+    <div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div>${t.obiettivo_giorno?`<div class="sub">obiettivo ${t.obiettivo_giorno} a testa</div>`:''}</div>`).join('')}</div>
+    <div class="section-title">Per operatrice</div>
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th><th>Stato</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}<th class="num">Ultima</th></tr></thead><tbody>
+      ${ops.map(o=>{const s=stato(o);return`<tr><td><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span>${esc(o.nome)}</div></td><td><span class="pill bg-${s.cls} c-${s.cls}">${s.txt}</span></td>${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}<td class="num muted">${ultimaDi[o.id]?hhmm(ultimaDi[o.id]):'—'}</td></tr>`;}).join('')}
+      <tr class="tot"><td>Totale</td><td></td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}<td></td></tr></tbody></table></div>
+    <div class="section-title">Ultime registrazioni</div>
+    <div class="card card-flush feed" id="live-feed">${d.regs.length?d.regs.slice(0,40).map(r=>rigaReg(r,false,evidenzia&&r.id===evidenzia)).join(''):'<div class="empty">Nessuna registrazione oggi.</div>'}</div>`;
+}
+function rigaReg(r,conData,nuova){
+  const t=tipoDi(r.tipo_codice),o=opDi(r.operatrice_id);
+  return`<div class="row${nuova?' new':''}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
+    <div class="row-body"><div class="row-title"><b>${esc(o.nome)}</b> · ${esc(t.nome)}${r.cliente?` · ${esc(r.cliente)}`:''}</div>
+    <div class="row-sub">${[r.telefono,r.data_appuntamento?'app. '+ddmmyyyy(r.data_appuntamento):'',r.note].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div>
+    <span class="row-time">${conData?labelGiorno(r.data,false)+' ':''}${hhmm(r.ora)}</span></div>`;
+}
+async function chiudiTurnoAdmin(id){if(!confirm('Chiudere questo turno adesso?'))return;try{await api(`cc_turni?id=eq.${id}`,'PATCH',{fine:new Date().toISOString()});invalidaCache();renderLive();}catch(e){toast('Errore: '+e.message);}}
+
+// ── OPERATRICI (periodo) ──
+async function renderOperatrici(){
+  const el=document.getElementById('tab-operatrici'),p=periodoCorrente();
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const ta=tipiAttivi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
+  const perOp={},oreOp={},giorniOp={};
+  d.regs.forEach(r=>{(perOp[r.operatrice_id]=perOp[r.operatrice_id]||{})[r.tipo_codice]=(perOp[r.operatrice_id]?.[r.tipo_codice]||0)+1;(giorniOp[r.operatrice_id]=giorniOp[r.operatrice_id]||new Set()).add(r.data);});
+  d.turni.forEach(t=>oreOp[t.operatrice_id]=(oreOp[t.operatrice_id]||0)+(new Date(t.fine||Date.now())-new Date(t.inizio)));
+  const tot={};d.regs.forEach(r=>tot[r.tipo_codice]=(tot[r.tipo_codice]||0)+1);
+  const base=ta[0],esito=ta.find(t=>/app/i.test(t.codice))||ta[2];   // tasso = appuntamenti / chiamate
+  const totOre=Object.values(oreOp).reduce((a,b)=>a+b,0);
+  const max=Math.max(1,...ops.map(o=>perOp[o.id]?.[base?.codice]||0));
+  el.innerHTML=`<div class="section-title">${esc(p.label)}</div>
+    <div class="metrics">${ta.map(t=>`<div class="metric"><div class="val c-${t.colore}">${tot[t.codice]||0}</div><div class="lbl">${esc(t.nome)}</div></div>`).join('')}
+      ${base&&esito&&base!==esito?`<div class="metric"><div class="val">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</div><div class="lbl">${esc(esito.nome)} / ${esc(base.nome)}</div></div>`:''}
+      <div class="metric"><div class="val">${ore(totOre)}</div><div class="lbl">Ore in turno</div></div></div>
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Operatrice</th>${ta.map(t=>`<th class="num">${esc(t.nome)}</th>`).join('')}${base&&esito&&base!==esito?'<th class="num">Resa</th>':''}<th class="num">Giorni</th><th class="num">Ore</th>${base?`<th class="num">${esc(base.nome)}/ora</th>`:''}</tr></thead><tbody>
+      ${ops.sort((a,b)=>(perOp[b.id]?.[base?.codice]||0)-(perOp[a.id]?.[base?.codice]||0)).map(o=>{const n=perOp[o.id]?.[base?.codice]||0,h=oreOp[o.id]||0;return`<tr><td style="min-width:160px"><div class="flex"><span class="avatar sm">${iniziali(o.nome)}</span><div style="flex:1">${esc(o.nome)}${!o.attiva?' <span class="pill bg-gray c-gray">disattivata</span>':''}<div class="bar-wrap" style="max-width:140px"><div class="bar fill-${base?.colore||'blue'}" style="width:${pct(n,max)}%"></div></div></div></div></td>
+        ${ta.map(t=>`<td class="num">${perOp[o.id]?.[t.codice]||''}</td>`).join('')}
+        ${base&&esito&&base!==esito?`<td class="num">${n?pct(perOp[o.id]?.[esito.codice]||0,n)+'%':''}</td>`:''}
+        <td class="num">${giorniOp[o.id]?.size||''}</td><td class="num">${h?ore(h):''}</td>${base?`<td class="num">${h>1800000?(n/(h/3600000)).toFixed(1).replace('.',','):''}</td>`:''}</tr>`;}).join('')}
+      <tr class="tot"><td>Totale</td>${ta.map(t=>`<td class="num">${tot[t.codice]||0}</td>`).join('')}${base&&esito&&base!==esito?`<td class="num">${pct(tot[esito.codice]||0,tot[base.codice]||0)}%</td>`:''}<td></td><td class="num">${ore(totOre)}</td>${base?'<td></td>':''}</tr></tbody></table></div>
+    <div class="muted" style="padding:6px 4px">Resa = ${esc(esito?.nome||'')} ogni 100 ${esc(base?.nome||'').toLowerCase()}. L'ordine della tabella segue la prima attività in Gestione → Attività.</div>`;
+}
+
+// ── ANDAMENTO (periodo) ──
+let _metricaAnd=null;
+async function renderAndamento(){
+  const el=document.getElementById('tab-andamento'),p=periodoCorrente();
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const ta=tipiAttivi();if(!_metricaAnd||!ta.some(t=>t.codice===_metricaAnd))_metricaAnd=ta[0]?.codice;
+  const t=tipoDi(_metricaAnd),regs=d.regs.filter(r=>r.tipo_codice===_metricaAnd);
+  // per ora del giorno (sempre)
+  const perOra=Array(24).fill(0);regs.forEach(r=>perOra[new Date(r.ora).getHours()]++);
+  const h0=Math.min(8,perOra.findIndex(v=>v>0)<0?8:perOra.findIndex(v=>v>0)),h1=Math.max(19,23-[...perOra].reverse().findIndex(v=>v>0));
+  const maxOra=Math.max(1,...perOra);
+  // per giorno (settimana / mese) oppure per operatrice (giorno)
+  let blocco='';
+  if(p.mode!=='giorno'){
+    const giorni=[];for(let g=p.start;g<=p.end;g=isoAddDays(g,1))giorni.push(g);
+    const perG={};regs.forEach(r=>perG[r.data]=(perG[r.data]||0)+1);
+    const maxG=Math.max(1,...Object.values(perG));
+    blocco=`<div class="section-title">${esc(t.nome)} per giorno</div><div class="card"><div class="chart">${giorni.map(g=>{const wd=isoToDate(g).getDay();return`<div class="col${g===oggiIso()?' today':''}${wd===0?' off':''}"><div class="v">${perG[g]||''}</div><div class="b fill-${t.colore}" style="height:${pct(perG[g]||0,maxG)}%"></div><div class="l">${p.mode==='sett'?labelGiorno(g,false):isoToDate(g).getDate()}</div></div>`;}).join('')}</div></div>`;
+  }else{
+    const perOp={};regs.forEach(r=>perOp[r.operatrice_id]=(perOp[r.operatrice_id]||0)+1);
+    const lista=Object.entries(perOp).sort((a,b)=>b[1]-a[1]),maxO=Math.max(1,...lista.map(x=>x[1]));
+    blocco=`<div class="section-title">${esc(t.nome)} per operatrice</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
+  }
+  el.innerHTML=`<div class="section-title">${esc(p.label)}</div>
+    <div class="seg seg-full" style="flex-wrap:wrap">${ta.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
+    ${blocco}
+    <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card"><div class="chart">${perOra.slice(h0,h1+1).map((v,i)=>`<div class="col"><div class="v">${v||''}</div><div class="b fill-${t.colore}" style="height:${pct(v,maxOra)}%"></div><div class="l">${h0+i}</div></div>`).join('')}</div></div>`;
+}
+
+// ── REGISTRAZIONI (periodo, con filtri e Excel) ──
+let _fOp='',_fTipo='';
+async function renderRegistrazioni(){
+  const el=document.getElementById('tab-registrazioni'),p=periodoCorrente();
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  let d;try{d=await datiPeriodo(p);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo));
+  el.innerHTML=`<div class="flex wrap" style="margin-bottom:12px">
+      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le operatrici</option>${operatrici.filter(o=>o.ruolo!=='admin').map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
+      <select style="width:auto;flex:1;min-width:140px" onchange="_fTipo=this.value;renderRegistrazioni()"><option value="">Tutte le attività</option>${tipi.map(t=>`<option value="${t.codice}" ${_fTipo===t.codice?'selected':''}>${esc(t.nome)}</option>`).join('')}</select>
+      <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button></div>
+    <div class="muted" style="padding:0 4px 8px">${regs.length} registrazioni · ${esc(p.label)}</div>
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Quando</th><th>Operatrice</th><th>Attività</th><th>Cliente</th><th>Telefono</th><th>Data app.</th><th>Note</th><th></th></tr></thead><tbody>
+      ${regs.length?regs.slice(0,500).map(r=>{const t=tipoDi(r.tipo_codice);return`<tr><td class="muted">${labelGiorno(r.data,p.mode==='mese')} ${hhmm(r.ora)}</td><td>${nomeOp(r.operatrice_id)}</td><td><span class="pill bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i> ${esc(t.nome)}</span></td><td>${esc(r.cliente||'')}</td><td>${esc(r.telefono||'')}</td><td>${ddmmyyyy(r.data_appuntamento)}</td><td style="white-space:normal;max-width:260px">${esc(r.note||'')}</td><td><button class="btn btn-icon btn-sm" onclick="modificaReg(${r.id})" title="Modifica"><i class="ti ti-pencil"></i></button> <button class="btn btn-icon btn-sm" onclick="eliminaRegAdmin(${r.id})" title="Elimina"><i class="ti ti-trash"></i></button></td></tr>`;}).join(''):'<tr><td colspan="8" class="empty">Nessuna registrazione.</td></tr>'}
+    </tbody></table></div>${regs.length>500?'<div class="muted" style="padding:8px 4px">Mostrate le prime 500: restringi il periodo o usa l\'Excel.</div>':''}`;
+}
+async function eliminaRegAdmin(id){if(!confirm('Eliminare questa registrazione?'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'DELETE');invalidaCache();renderRegistrazioni();}catch(e){toast('Errore: '+e.message);}}
+function modificaReg(id){
+  const r=Object.values(_cache).flatMap(c=>c.regs).find(x=>x.id===id);if(!r)return;
+  apriModal(`<h2>Modifica registrazione</h2><div class="muted">${nomeOp(r.operatrice_id)} · ${labelGiorno(r.data)} ${hhmm(r.ora)}</div>
+    <label>Attività</label><select id="m-tipo">${tipi.map(t=>`<option value="${t.codice}" ${t.codice===r.tipo_codice?'selected':''}>${esc(t.nome)}</option>`).join('')}</select>
+    <label>Cliente</label><input id="m-cliente" value="${esc(r.cliente||'')}">
+    <label>Telefono</label><input id="m-telefono" value="${esc(r.telefono||'')}">
+    <label>Data appuntamento</label><input type="date" id="m-dataapp" value="${r.data_appuntamento||''}">
+    <label>Note</label><textarea id="m-note" rows="2">${esc(r.note||'')}</textarea>
+    <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaModificaReg(${id})">Salva</button></div>`);
+}
+async function salvaModificaReg(id){
+  const v=i=>document.getElementById(i).value.trim();
+  try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{tipo_codice:v('m-tipo'),cliente:v('m-cliente')||null,telefono:v('m-telefono')||null,data_appuntamento:v('m-dataapp')||null,note:v('m-note')||null});chiudiModal();invalidaCache();renderRegistrazioni();}
+  catch(e){toast('Errore: '+e.message);}
+}
+async function esportaExcel(){
+  const p=periodoCorrente(),d=await datiPeriodo(p);
+  const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo)).slice().reverse();
+  const ta=tipiAttivi(),q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const righe=[['Data','Ora','Operatrice','Attività','Cliente','Telefono','Data appuntamento','Note'].map(q).join(';')];
+  regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),r.note].map(q).join(';')));
+  righe.push('');righe.push(['Riepilogo per operatrice',...ta.map(t=>t.nome),'Ore in turno'].map(q).join(';'));
+  operatrici.filter(o=>o.ruolo!=='admin').forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),ore(h)].map(q).join(';'));});
+  const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`call-center-${p.start}${p.end!==p.start?'_'+p.end:''}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+// ── GESTIONE ──
+let _gest='operatrici';
+async function renderGestione(){
+  const el=document.getElementById('tab-gestione');
+  try{[tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso&order=nome')]);avvisi=await api('cc_avvisi?select=*&order=created_at.desc');}catch(e){}
+  let corpo='';
+  if(_gest==='operatrici'){
+    corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">Chi può entrare nel portale. Il PIN lo decidi tu.</span><button class="btn btn-primary btn-sm" onclick="apriOperatrice()"><i class="ti ti-plus"></i> Aggiungi</button></div>
+      <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
+  }else if(_gest==='attivita'){
+    corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">I pulsanti che vedono le operatrici. La prima è quella base (es. Chiamate).</span><button class="btn btn-primary btn-sm" onclick="apriTipo()"><i class="ti ti-plus"></i> Aggiungi</button></div>
+      <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
+        <button class="btn btn-icon btn-sm" ${i===0?'disabled':''} onclick="spostaTipo(${t.id},-1)" title="Su"><i class="ti ti-arrow-up"></i></button><button class="btn btn-icon btn-sm" ${i===tipi.length-1?'disabled':''} onclick="spostaTipo(${t.id},1)" title="Giù"><i class="ti ti-arrow-down"></i></button>
+        <button class="btn btn-sm" onclick="apriTipo(${t.id})"><i class="ti ti-pencil"></i></button></div>`).join('')}</div>`;
+  }else{
+    corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">Compaiono in alto nella schermata delle operatrici.</span><button class="btn btn-primary btn-sm" onclick="apriAvviso()"><i class="ti ti-plus"></i> Nuovo avviso</button></div>
+      <div class="card card-flush">${avvisi.length?avvisi.map(a=>`<div class="row"><div class="row-ic bg-amber c-amber"><i class="ti ti-speakerphone"></i></div><div class="row-body"><div class="row-title" style="white-space:normal">${esc(a.testo)}</div><div class="row-sub">${ddmmyyyy(a.created_at.slice(0,10))}${!a.attivo?' · nascosto':''}</div></div>
+        <button class="btn btn-sm" onclick="toggleAvviso(${a.id},${!a.attivo})">${a.attivo?'Nascondi':'Mostra'}</button><button class="btn btn-icon btn-sm" onclick="eliminaAvviso(${a.id})"><i class="ti ti-trash"></i></button></div>`).join(''):'<div class="empty">Nessun avviso.</div>'}</div>`;
+  }
+  el.innerHTML=`<div class="seg seg-full"><button class="${_gest==='operatrici'?'on':''}" onclick="_gest='operatrici';renderGestione()">Operatrici</button><button class="${_gest==='attivita'?'on':''}" onclick="_gest='attivita';renderGestione()">Attività</button><button class="${_gest==='avvisi'?'on':''}" onclick="_gest='avvisi';renderGestione()">Avvisi</button></div>${corpo}`;
+}
+function apriOperatrice(id){
+  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:'operatrice',attiva:true};
+  apriModal(`<h2>${id?'Modifica':'Nuova operatrice'}</h2>
+    <label>Nome</label><input id="g-nome" value="${esc(o.nome)}" placeholder="Nome e cognome">
+    <label>PIN (4 cifre)${id?' — lascia vuoto per non cambiarlo':''}</label><input id="g-pin" inputmode="numeric" maxlength="4" placeholder="••••">
+    <label>Ruolo</label><select id="g-ruolo"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Operatrice</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
+    <label class="flex" style="margin-top:16px"><input type="checkbox" id="g-attiva" ${o.attiva?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Attiva (può entrare)</span></label>
+    <div class="modal-actions">${id?`<button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="eliminaOperatrice(${id})">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaOperatrice(${id||'null'})">Salva</button></div>`);
+}
+async function salvaOperatrice(id){
+  const nome=document.getElementById('g-nome').value.trim(),pin=document.getElementById('g-pin').value.trim();
+  if(!nome)return toast('Manca il nome');
+  if((!id&&!/^\d{4}$/.test(pin))||(pin&&!/^\d{4}$/.test(pin)))return toast('Il PIN deve avere 4 cifre');
+  const body={nome,ruolo:document.getElementById('g-ruolo').value,attiva:document.getElementById('g-attiva').checked};if(pin)body.pin=pin;
+  try{if(id)await api(`cc_operatrici?id=eq.${id}`,'PATCH',body);else await api('cc_operatrici','POST',body);chiudiModal();await caricaBase();renderGestione();toast('Salvato');}
+  catch(e){toast('Errore: '+e.message);}
+}
+async function eliminaOperatrice(id){
+  if(!confirm('Eliminare questa operatrice? Spariscono anche tutte le sue registrazioni. Se vuoi solo bloccarle l\'accesso, togli la spunta "Attiva".'))return;
+  try{await api(`cc_operatrici?id=eq.${id}`,'DELETE');chiudiModal();await caricaBase();invalidaCache();renderGestione();}catch(e){toast('Errore: '+e.message);}
+}
+function apriTipo(id){
+  const t=id?tipi.find(x=>x.id===id):{codice:'',nome:'',descrizione:'',icona:'ti-phone',colore:'blue',attivo:true,chiede_dettaglio:false,obiettivo_giorno:0};
+  const icone=['ti-phone','ti-phone-outgoing','ti-phone-incoming','ti-phone-check','ti-phone-x','ti-phone-call','ti-calendar-check','ti-calendar-event','ti-circle-check','ti-mail','ti-message','ti-user-plus','ti-star','ti-thumb-up','ti-thumb-down','ti-clock','ti-flag','ti-coin'];
+  apriModal(`<h2>${id?'Modifica attività':'Nuova attività'}</h2>
+    <label>Nome del pulsante</label><input id="t-nome" value="${esc(t.nome)}" placeholder="es. Appuntamenti fissati">
+    <label>Descrizione breve</label><input id="t-desc" value="${esc(t.descrizione||'')}" placeholder="Quando va premuto">
+    <div class="two-col"><div><label>Icona</label><select id="t-icona">${icone.map(i=>`<option value="${i}" ${i===t.icona?'selected':''}>${i.replace('ti-','')}</option>`).join('')}</select></div>
+    <div><label>Colore</label><select id="t-colore">${COLORI.map(c=>`<option value="${c}" ${c===t.colore?'selected':''}>${c}</option>`).join('')}</select></div></div>
+    <label>Obiettivo giornaliero per operatrice (0 = nessuno)</label><input type="number" id="t-ob" min="0" value="${t.obiettivo_giorno||0}">
+    <label class="flex" style="margin-top:16px"><input type="checkbox" id="t-dett" ${t.chiede_dettaglio?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Chiede cliente, telefono, data e note</span></label>
+    <label class="flex" style="margin-top:10px"><input type="checkbox" id="t-attivo" ${t.attivo?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Visibile alle operatrici</span></label>
+    <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaTipo(${id||'null'})">Salva</button></div>`);
+}
+async function salvaTipo(id){
+  const v=i=>document.getElementById(i).value.trim();if(!v('t-nome'))return toast('Manca il nome');
+  const body={nome:v('t-nome'),descrizione:v('t-desc')||null,icona:v('t-icona'),colore:v('t-colore'),obiettivo_giorno:+v('t-ob')||0,chiede_dettaglio:document.getElementById('t-dett').checked,attivo:document.getElementById('t-attivo').checked};
+  try{
+    if(id)await api(`cc_tipi?id=eq.${id}`,'PATCH',body);
+    else{body.codice=v('t-nome').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||('tipo_'+Date.now());body.ordine=(Math.max(0,...tipi.map(t=>t.ordine))+1);await api('cc_tipi','POST',body);}
+    chiudiModal();renderGestione();toast('Salvato');
+  }catch(e){toast('Errore: '+e.message);}
+}
+async function spostaTipo(id,dir){
+  const i=tipi.findIndex(t=>t.id===id),j=i+dir;if(j<0||j>=tipi.length)return;
+  const ordini=tipi.map((t,k)=>k+1);   // normalizzo 1..n poi scambio
+  try{await Promise.all([api(`cc_tipi?id=eq.${tipi[i].id}`,'PATCH',{ordine:ordini[j]}),api(`cc_tipi?id=eq.${tipi[j].id}`,'PATCH',{ordine:ordini[i]}),...tipi.filter((t,k)=>k!==i&&k!==j&&t.ordine!==ordini[k]).map((t)=>api(`cc_tipi?id=eq.${t.id}`,'PATCH',{ordine:ordini[tipi.indexOf(t)]}))]);renderGestione();}
+  catch(e){toast('Errore: '+e.message);}
+}
+function apriAvviso(){apriModal(`<h2>Nuovo avviso</h2><label>Testo</label><textarea id="a-testo" rows="3" placeholder="Es. Oggi spingere sulla zona di Roma Nord"></textarea><div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaAvviso()">Pubblica</button></div>`);}
+async function salvaAvviso(){const t=document.getElementById('a-testo').value.trim();if(!t)return;try{await api('cc_avvisi','POST',{testo:t});chiudiModal();renderGestione();}catch(e){toast('Errore: '+e.message);}}
+async function toggleAvviso(id,att){try{await api(`cc_avvisi?id=eq.${id}`,'PATCH',{attivo:att});renderGestione();}catch(e){toast('Errore: '+e.message);}}
+async function eliminaAvviso(id){if(!confirm('Eliminare l\'avviso?'))return;try{await api(`cc_avvisi?id=eq.${id}`,'DELETE');renderGestione();}catch(e){toast('Errore: '+e.message);}}
+
+// ── TEMPO REALE (admin): nuove registrazioni e turni arrivano da soli ──
+let _rtTimer=null;
+function avviaRealtime(){
+  if(!window.supabase){setLiveBadge(false);return;}
+  try{
+    const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    _rt=sb.channel('cc-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'cc_registrazioni'},p=>onLive(p))
+      .on('postgres_changes',{event:'*',schema:'public',table:'cc_turni'},p=>onLive(p))
+      .subscribe(status=>{_rtOk=status==='SUBSCRIBED';setLiveBadge(_rtOk);});
+  }catch(e){setLiveBadge(false);}
+}
+function setLiveBadge(on){const b=document.getElementById('live-badge');b.classList.toggle('on',on);b.title=on?'Collegato: gli aggiornamenti arrivano in tempo reale':'Aggiornamento automatico ogni 30 secondi';}
+function onLive(payload){
+  invalidaCache();
+  const nuovoId=payload?.eventType==='INSERT'&&payload.table==='cc_registrazioni'?payload.new?.id:null;
+  clearTimeout(_rtTimer);
+  _rtTimer=setTimeout(()=>{const t=tabAttivo();if(t==='tab-live')renderLive(nuovoId);else if(t==='tab-operatrici')renderOperatrici();else if(t==='tab-andamento')renderAndamento();else if(t==='tab-registrazioni')renderRegistrazioni();},350);
+}
+
+// ── Modal / toast ──
+function apriModal(html){document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)chiudiModal()"><div class="modal"><div class="modal-grab"></div>${html}</div></div>`;}
+function chiudiModal(){document.getElementById('modal-root').innerHTML='';}
+let _toastTimer=null;
+function toast(msg,azione){
+  const el=document.getElementById('toast');
+  el.innerHTML=esc(msg)+(azione?`<button id="toast-btn">${esc(azione.label)}</button>`:'');
+  if(azione)document.getElementById('toast-btn').onclick=()=>{el.classList.remove('show');azione.fn();};
+  el.classList.add('show');clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>el.classList.remove('show'),azione?5000:2200);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')chiudiModal();});
+</script>
+</body>
+</html>
