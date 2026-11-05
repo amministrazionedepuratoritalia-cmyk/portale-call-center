@@ -46,6 +46,8 @@ create table if not exists cc_registrazioni (
   telefono          text,
   data_appuntamento date,
   note              text,
+  demo              text check (demo in ('fatta','non_fatta')),  -- segnata dall'admin sugli appuntamenti
+  demo_data         date,
   created_at        timestamptz not null default now()
 );
 create index if not exists cc_registrazioni_data_idx on cc_registrazioni(data);

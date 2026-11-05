@@ -167,6 +167,10 @@
     .op-empty { padding:10px 0 12px; color:var(--text3); font-size:13px; border-top:0.5px solid var(--sep); }
     .fonte-tile .stats { display:grid; grid-template-columns:1fr 1fr 1fr; margin-top:6px; }
     @media(max-width:560px){ .op-grid { grid-template-columns:1fr; } .op-row { grid-template-columns:86px 1fr 1fr 1fr; } .stat b { font-size:19px; } .stat span { font-size:9px; } .op-card { padding:10px 12px 0; } .op-row.tot { margin:0 -12px; padding:9px 12px; } }
+    /* ── DEMO sugli appuntamenti ── */
+    .demo-seg { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; flex-shrink:0; }
+    .op-demo { display:flex; align-items:center; gap:8px; padding:8px 0 10px; border-top:0.5px solid var(--sep); font-size:13px; }
+    .op-demo b { font-size:16px; }
     .fonte-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:14px; }
     .fonte-card { background:var(--surface); border-radius:16px; box-shadow:var(--sh-xs); padding:12px 14px 6px; }
     .fonte-head { display:flex; align-items:center; gap:10px; padding-bottom:8px; }
@@ -261,7 +265,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.3 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.4 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -281,6 +285,7 @@
   </div>
   <div class="nav-tabs">
     <div class="tab active" onclick="switchTab(this,'op-tab-oggi')"><i class="ti ti-headset"></i> Oggi</div>
+    <div class="tab" onclick="switchTab(this,'op-tab-app');loadAppOp()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
     <div class="tab" onclick="switchTab(this,'op-tab-storico');loadStoricoOp()"><i class="ti ti-history"></i> Storico</div>
   </div>
   <div class="page-content">
@@ -291,6 +296,10 @@
       <div id="op-obiettivi"></div>
       <div class="section-title">Oggi, in ordine di tempo</div>
       <div class="card card-flush" id="op-lista"></div>
+    </div>
+    <div id="op-tab-app" class="hidden">
+      <div class="flex" style="margin-bottom:12px"><select id="op-app-mese" onchange="loadAppOp()"></select></div>
+      <div id="op-app"></div>
     </div>
     <div id="op-tab-storico" class="hidden">
       <div class="flex" style="margin-bottom:12px"><select id="op-storico-mese" onchange="loadStoricoOp()"></select></div>
@@ -327,6 +336,7 @@
     <div class="tab active" onclick="switchTab(this,'tab-live');renderLive()"><i class="ti ti-broadcast"></i> Adesso</div>
     <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Telefoniste</div>
     <div class="tab" onclick="switchTab(this,'tab-andamento');renderAndamento()"><i class="ti ti-chart-bar"></i> Andamento</div>
+    <div class="tab" onclick="switchTab(this,'tab-appuntamenti');renderAppuntamenti()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
     <div class="tab" onclick="switchTab(this,'tab-registrazioni');renderRegistrazioni()"><i class="ti ti-list"></i> Registrazioni</div>
     <div class="tab" onclick="switchTab(this,'tab-gestione');renderGestione()"><i class="ti ti-settings"></i> Gestione</div>
   </div>
@@ -334,6 +344,7 @@
     <div id="tab-live"><div class="loading"><div class="spinner"></div>Carico…</div></div>
     <div id="tab-operatrici" class="hidden"></div>
     <div id="tab-andamento" class="hidden"></div>
+    <div id="tab-appuntamenti" class="hidden"></div>
     <div id="tab-registrazioni" class="hidden"></div>
     <div id="tab-gestione" class="hidden"></div>
   </div>
@@ -402,7 +413,7 @@ const GRUPPI={contatti:'Contatti',appuntamenti:'Appuntamenti presi'};
 function codiciGruppo(g){return new Set(tipi.filter(t=>t.gruppo===g).map(t=>t.codice));}
 function haGruppi(){return tipi.some(t=>t.attivo&&t.gruppo==='contatti')&&tipi.some(t=>t.attivo&&t.gruppo==='appuntamenti');}
 function contaGruppo(regs,g){const c=codiciGruppo(g);return regs.filter(r=>c.has(r.tipo_codice)).length;}
-function metricheGruppi(regs,extra=''){if(!haGruppi())return '';const c=contaGruppo(regs,'contatti'),a=contaGruppo(regs,'appuntamenti');return `<div class="metric" style="border-top:3px solid var(--blue)"><div class="val">${c}</div><div class="lbl">Contatti totali</div>${extra}</div><div class="metric" style="border-top:3px solid var(--green)"><div class="val">${a}</div><div class="lbl">Appuntamenti totali</div></div><div class="metric" style="border-top:3px solid var(--purple)"><div class="val">${pct(a,c)}%</div><div class="lbl">Resa</div><div class="sub">appuntamenti ogni 100 contatti</div></div>`;}
+function metricheGruppi(regs,extra=''){if(!haGruppi())return '';const c=contaGruppo(regs,'contatti'),a=contaGruppo(regs,'appuntamenti');return `<div class="metric" style="border-top:3px solid var(--blue)"><div class="val">${c}</div><div class="lbl">Contatti totali</div>${extra}</div><div class="metric" style="border-top:3px solid var(--green)"><div class="val">${a}</div><div class="lbl">Appuntamenti totali</div></div><div class="metric" style="border-top:3px solid var(--purple)"><div class="val">${pct(a,c)}%</div><div class="lbl">Resa</div><div class="sub">appuntamenti ogni 100 contatti</div></div>${tileDemo(regs)}`;}
 
 // ── Avvio ──
 async function caricaBase(){
@@ -480,8 +491,14 @@ function cardOperatrice(o,regs,opt={}){
   const cols=colonneCompatte(tipiAttivi()).filter(col=>{const{c,a}=contaCol(regs,col);return c||a;});
   const righe=cols.map(col=>{const{c,a}=contaCol(regs,col);return `<div class="op-row"><div class="fn c-${col.colore}">${esc(col.nome)}</div>${statHtml(c,a,col.coppia)}</div>`;}).join('');
   const tot=cols.length>1&&haGruppi()?`<div class="op-row tot"><div class="fn">Totale</div>${statHtml(contaGruppo(regs,'contatti'),contaGruppo(regs,'appuntamenti'),true)}</div>`:'';
-  return `<div class="op-card"><div class="op-head">${opt.rank?`<span class="rank r${opt.rank}">${opt.rank}</span>`:''}<span class="avatar sm">${iniziali(o.nome)}</span><div style="flex:1;min-width:0"><div class="nome">${esc(o.nome)}${!o.attiva?' <span class="pill bg-gray c-gray">disattivata</span>':''}</div>${opt.sub?`<div class="muted" style="font-size:12px">${opt.sub}</div>`:''}</div>${opt.badge||''}</div>${righe||`<div class="op-empty">${opt.vuoto||'Nessuna registrazione'}</div>`}${tot}${righe&&!tot?'<div style="height:4px"></div>':''}</div>`;
+  const nd=contaDemo(regs),demo=nd.app?`<div class="op-demo"><i class="ti ti-presentation c-green" style="font-size:18px"></i><span><b class="c-green">${nd.fatte}</b> demo fatte su <b>${nd.app}</b> appuntamenti${nd.non?` · <span class="c-red">${nd.non} non fatte</span>`:''}${nd.da?` · <span class="muted">${nd.da} da fare</span>`:''}</span></div>`:'';
+  return `<div class="op-card"><div class="op-head">${opt.rank?`<span class="rank r${opt.rank}">${opt.rank}</span>`:''}<span class="avatar sm">${iniziali(o.nome)}</span><div style="flex:1;min-width:0"><div class="nome">${esc(o.nome)}${!o.attiva?' <span class="pill bg-gray c-gray">disattivata</span>':''}</div>${opt.sub?`<div class="muted" style="font-size:12px">${opt.sub}</div>`:''}</div>${opt.badge||''}</div>${righe||`<div class="op-empty">${opt.vuoto||'Nessuna registrazione'}</div>`}${tot}${demo}${righe&&!tot&&!demo?'<div style="height:4px"></div>':''}</div>`;
 }
+// Demo: l'admin la segna sugli appuntamenti; le telefoniste la vedono
+function isApp(r){return codiciGruppo('appuntamenti').has(r.tipo_codice);}
+function demoBadge(r){return r.demo==='fatta'?`<span class="pill bg-green c-green"><i class="ti ti-check"></i> Demo fatta${r.demo_data?' il '+ddmm(r.demo_data):''}</span>`:r.demo==='non_fatta'?`<span class="pill bg-red c-red"><i class="ti ti-x"></i> Demo non fatta</span>`:`<span class="pill bg-gray c-gray"><i class="ti ti-clock"></i> Demo da fare</span>`;}
+function contaDemo(regs){const app=regs.filter(isApp);return{app:app.length,fatte:app.filter(r=>r.demo==='fatta').length,non:app.filter(r=>r.demo==='non_fatta').length,da:app.filter(r=>!r.demo).length};}
+function tileDemo(regs){const n=contaDemo(regs);if(!n.app)return'';return `<div class="metric" style="border-top:3px solid var(--green-sys)"><div class="val c-green">${n.fatte}</div><div class="lbl">Demo fatte</div><div class="sub">${pct(n.fatte,n.app)}% degli appuntamenti</div></div>`;}
 const LEGENDA='<div class="muted" style="padding:0 4px 8px">In ogni casella: <b>contatti</b> <span class="sl">/</span> <b class="c-green">appuntamenti presi</b></div>';
 
 // ══════════════════════════════════════════════════════════════
@@ -490,7 +507,7 @@ const LEGENDA='<div class="muted" style="padding:0 4px 8px">In ogni casella: <b>
 async function avviaOperatrice(){
   document.getElementById('op-avatar').textContent=iniziali(currentUser.nome);
   document.getElementById('op-name').textContent=currentUser.nome;
-  popolaMesi('op-storico-mese');
+  popolaMesi('op-storico-mese');popolaMesi('op-app-mese');
   resetTabs('op');showScreen('op');
   await Promise.all([loadOggiOp(),loadAvvisiOp()]);
   clearInterval(_timerTurno);_timerTurno=setInterval(renderTurnoOp,30000);
@@ -605,7 +622,7 @@ function renderListaOp(){
       <div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
       <div class="row-body"><div class="row-title">${esc(t.nome)}${r.cliente?` · <b>${esc(r.cliente)}</b>`:''}</div>
         <div class="row-sub">${[r.telefono,r.data_appuntamento?'app. '+ddmmyyyy(r.data_appuntamento):'',r.note].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div>
-      <span class="row-time">${hhmm(r.ora)}</span>
+      ${isApp(r)&&r.demo?demoBadge(r):''}<span class="row-time">${hhmm(r.ora)}</span>
       <button class="btn btn-icon btn-sm" title="Elimina" onclick="eliminaRegOp(${r.id})"><i class="ti ti-x"></i></button>
     </div>`;}).join('');
 }
@@ -644,6 +661,19 @@ async function salvaDettaglio(codice){
   const v=id=>document.getElementById(id).value.trim();
   const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,note:v('d-note')||null});
   if(ok)chiudiModal();
+}
+async function loadAppOp(){
+  const mese=document.getElementById('op-app-mese').value,el=document.getElementById('op-app');
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  const {start,end}=meseRange(mese),cod=[...codiciGruppo('appuntamenti')];
+  if(!cod.length){el.innerHTML='<div class="empty">Nessuna attività di tipo appuntamento.</div>';return;}
+  const regs=await api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&tipo_codice=in.(${cod.join(',')})&select=*&order=ora.desc`);
+  const n=contaDemo(regs);
+  el.innerHTML=`<div class="metrics"><div class="metric"><div class="val">${n.app}</div><div class="lbl">Appuntamenti presi</div></div><div class="metric"><div class="val c-green">${n.fatte}</div><div class="lbl">Demo fatte</div>${n.app?`<div class="sub">${pct(n.fatte,n.app)}% dei tuoi appuntamenti</div>`:''}</div><div class="metric"><div class="val c-red">${n.non}</div><div class="lbl">Demo non fatte</div></div><div class="metric"><div class="val">${n.da}</div><div class="lbl">Demo da fare</div></div></div>
+    <div class="muted" style="padding:0 4px 8px">La demo la segna l'ufficio: qui la vedi e basta.</div>
+    ${regs.length?`<div class="card card-flush">${regs.map(r=>{const t=tipoDi(r.tipo_codice);return`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
+      <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b> · ${esc(t.fonte||t.nome)}</div>
+      <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento):'preso '+labelGiorno(r.data),r.note].filter(Boolean).map(esc).join(' · ')}</div></div>${demoBadge(r)}</div>`;}).join('')}</div>`:'<div class="empty">Nessun appuntamento in questo mese.</div>'}`;
 }
 async function loadStoricoOp(){
   const mese=document.getElementById('op-storico-mese').value,el=document.getElementById('op-storico');
@@ -715,7 +745,7 @@ function aggiornaFrecce(){
 function tabAttivo(){return document.querySelector('#screen-admin .page-content > div:not(.hidden)')?.id;}
 function onPeriodoChange(){
   aggiornaFrecce();
-  const f={'tab-live':renderLive,'tab-operatrici':renderOperatrici,'tab-andamento':renderAndamento,'tab-registrazioni':renderRegistrazioni}[tabAttivo()];
+  const f={'tab-live':renderLive,'tab-operatrici':renderOperatrici,'tab-andamento':renderAndamento,'tab-registrazioni':renderRegistrazioni,'tab-appuntamenti':renderAppuntamenti}[tabAttivo()];
   if(f)f();
 }
 async function datiPeriodo(p){
@@ -770,7 +800,7 @@ function rigaReg(r,conData,nuova){
   return`<div class="row${nuova?' new':''}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
     <div class="row-body"><div class="row-title"><b>${esc(o.nome)}</b> · ${esc(t.nome)}${r.cliente?` · ${esc(r.cliente)}`:''}</div>
     <div class="row-sub">${[r.telefono,r.data_appuntamento?'app. '+ddmmyyyy(r.data_appuntamento):'',r.note].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div>
-    <span class="row-time">${conData?labelGiorno(r.data,false)+' ':''}${hhmm(r.ora)}</span></div>`;
+    ${isApp(r)&&r.demo?demoBadge(r):''}<span class="row-time">${conData?labelGiorno(r.data,false)+' ':''}${hhmm(r.ora)}</span></div>`;
 }
 async function chiudiTurnoAdmin(id){if(!confirm('Chiudere questo turno adesso?'))return;try{await api(`cc_turni?id=eq.${id}`,'PATCH',{fine:new Date().toISOString()});invalidaCache();renderLive();}catch(e){toast('Errore: '+e.message);}}
 
@@ -833,6 +863,35 @@ async function renderAndamento(){
 }
 
 // ── REGISTRAZIONI (periodo, con filtri e Excel) ──
+// ── APPUNTAMENTI (periodo): l'admin segna la demo ──
+let _fDemo='';
+async function renderAppuntamenti(){
+  const el=document.getElementById('tab-appuntamenti'),p=periodoCorrente();
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const app=d.regs.filter(isApp),n=contaDemo(app);
+  const lista=app.filter(r=>!_fDemo||(_fDemo==='da'?!r.demo:r.demo===_fDemo)).sort((a,b)=>(b.data_appuntamento||b.data)+b.ora>(a.data_appuntamento||a.data)+a.ora?1:-1);
+  el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()} · appuntamenti presi</div>
+    <div class="metrics"><div class="metric"><div class="val">${n.app}</div><div class="lbl">Appuntamenti presi</div></div><div class="metric" style="border-top:3px solid var(--green-sys)"><div class="val c-green">${n.fatte}</div><div class="lbl">Demo fatte</div>${n.app?`<div class="sub">${pct(n.fatte,n.app)}% degli appuntamenti</div>`:''}</div><div class="metric" style="border-top:3px solid var(--red-sys)"><div class="val c-red">${n.non}</div><div class="lbl">Demo non fatte</div></div><div class="metric" style="border-top:3px solid var(--text4)"><div class="val">${n.da}</div><div class="lbl">Demo da fare</div></div></div>
+    <div class="seg seg-full"><button class="${!_fDemo?'on':''}" onclick="_fDemo='';renderAppuntamenti()">Tutti</button><button class="${_fDemo==='da'?'on':''}" onclick="_fDemo='da';renderAppuntamenti()">Da fare</button><button class="${_fDemo==='fatta'?'on':''}" onclick="_fDemo='fatta';renderAppuntamenti()">Fatte</button><button class="${_fDemo==='non_fatta'?'on':''}" onclick="_fDemo='non_fatta';renderAppuntamenti()">Non fatte</button></div>
+    <div class="muted" style="padding:0 4px 8px">Premi <b>Demo fatta</b> o <b>Non fatta</b> su ogni appuntamento: le telefoniste lo vedono subito nella loro scheda Appuntamenti.</div>
+    <div class="card card-flush">${lista.length?lista.slice(0,400).map(rigaApp).join(''):'<div class="empty">Nessun appuntamento qui.</div>'}</div>${lista.length>400?'<div class="muted" style="padding:8px 4px">Mostrati i primi 400: restringi il periodo.</div>':''}`;
+}
+function rigaApp(r){
+  const t=tipoDi(r.tipo_codice),o=opDi(r.operatrice_id);
+  return `<div class="row" id="app-${r.id}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
+    <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b> · ${esc(o.nome)} · ${esc(t.fonte||t.nome)}</div>
+    <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento):'preso '+labelGiorno(r.data),r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
+    <div class="demo-seg"><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}</div></div>`;
+}
+async function setDemo(id,v){
+  try{
+    await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});
+    Object.values(_cache).forEach(c=>c.regs.forEach(r=>{if(r.id===id){r.demo=v;r.demo_data=v?oggiIso():null;}}));
+    renderAppuntamenti();toast(v==='fatta'?'Demo segnata come fatta':v==='non_fatta'?'Demo segnata come non fatta':'Rimessa tra quelle da fare');
+  }catch(e){toast('Errore: '+e.message);}
+}
+
 let _fOp='',_fTipo='';
 async function renderRegistrazioni(){
   const el=document.getElementById('tab-registrazioni'),p=periodoCorrente();
@@ -845,8 +904,8 @@ async function renderRegistrazioni(){
       <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button>
       <button class="btn btn-primary btn-sm" onclick="apriInserimento()"><i class="ti ti-plus"></i> Inserisci dati passati</button></div>
     <div class="muted" style="padding:0 4px 8px">${regs.length} registrazioni · ${esc(p.label)}</div>
-    <div class="card card-flush table-wrap"><table><thead><tr><th>Quando</th><th>Telefonista</th><th>Attività</th><th>Cliente</th><th>Telefono</th><th>Data app.</th><th>Note</th><th></th></tr></thead><tbody>
-      ${regs.length?regs.slice(0,500).map(r=>{const t=tipoDi(r.tipo_codice);return`<tr><td class="muted">${labelGiorno(r.data,p.mode==='mese')} ${hhmm(r.ora)}</td><td>${nomeOp(r.operatrice_id)}</td><td><span class="pill bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i> ${esc(t.nome)}</span></td><td>${esc(r.cliente||'')}</td><td>${esc(r.telefono||'')}</td><td>${ddmmyyyy(r.data_appuntamento)}</td><td style="white-space:normal;max-width:260px">${esc(r.note||'')}</td><td><button class="btn btn-icon btn-sm" onclick="modificaReg(${r.id})" title="Modifica"><i class="ti ti-pencil"></i></button> <button class="btn btn-icon btn-sm" onclick="eliminaRegAdmin(${r.id})" title="Elimina"><i class="ti ti-trash"></i></button></td></tr>`;}).join(''):'<tr><td colspan="8" class="empty">Nessuna registrazione.</td></tr>'}
+    <div class="card card-flush table-wrap"><table><thead><tr><th>Quando</th><th>Telefonista</th><th>Attività</th><th>Cliente</th><th>Telefono</th><th>Data app.</th><th>Demo</th><th>Note</th><th></th></tr></thead><tbody>
+      ${regs.length?regs.slice(0,500).map(r=>{const t=tipoDi(r.tipo_codice);return`<tr><td class="muted">${labelGiorno(r.data,p.mode==='mese')} ${hhmm(r.ora)}</td><td>${nomeOp(r.operatrice_id)}</td><td><span class="pill bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i> ${esc(t.nome)}</span></td><td>${esc(r.cliente||'')}</td><td>${esc(r.telefono||'')}</td><td>${ddmmyyyy(r.data_appuntamento)}</td><td>${isApp(r)?demoBadge(r):''}</td><td style="white-space:normal;max-width:260px">${esc(r.note||'')}</td><td><button class="btn btn-icon btn-sm" onclick="modificaReg(${r.id})" title="Modifica"><i class="ti ti-pencil"></i></button> <button class="btn btn-icon btn-sm" onclick="eliminaRegAdmin(${r.id})" title="Elimina"><i class="ti ti-trash"></i></button></td></tr>`;}).join(''):'<tr><td colspan="9" class="empty">Nessuna registrazione.</td></tr>'}
     </tbody></table></div>${regs.length>500?'<div class="muted" style="padding:8px 4px">Mostrate le prime 500: restringi il periodo o usa l\'Excel.</div>':''}`;
 }
 // Inserimento manuale dell'admin: i numeri di un giorno passato per una telefonista (es. la settimana prima del portale)
@@ -897,11 +956,11 @@ async function esportaExcel(){
   const p=periodoCorrente(),d=filtraSquadra(await datiPeriodo(p));
   const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo)).slice().reverse();
   const ta=tipiAttivi(),q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
-  const righe=[['Data','Ora','Operatrice','Attività','Cliente','Telefono','Data appuntamento','Note'].map(q).join(';')];
-  regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),r.note].map(q).join(';')));
+  const righe=[['Data','Ora','Telefonista','Attività','Cliente','Telefono','Data appuntamento','Demo','Note'].map(q).join(';')];
+  regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),isApp(r)?(r.demo==='fatta'?'fatta':r.demo==='non_fatta'?'non fatta':'da fare'):'',r.note].map(q).join(';')));
   const G=haGruppi();
-  righe.push('');righe.push(['Riepilogo per telefonista','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %']:[]),'Ore in turno'].map(q).join(';'));
-  operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti'))]:[]),ore(h)].map(q).join(';'));});
+  righe.push('');righe.push(['Riepilogo per telefonista','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %','Demo fatte']:[]),'Ore in turno'].map(q).join(';'));
+  operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti')),contaDemo(mie).fatte]:[]),ore(h)].map(q).join(';'));});
   const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`call-center-${p.start}${p.end!==p.start?'_'+p.end:''}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
@@ -1015,7 +1074,7 @@ function onLive(payload){
   invalidaCache();
   const nuovoId=payload?.eventType==='INSERT'&&payload.table==='cc_registrazioni'?payload.new?.id:null;
   clearTimeout(_rtTimer);
-  _rtTimer=setTimeout(()=>{const t=tabAttivo();if(t==='tab-live')renderLive(nuovoId);else if(t==='tab-operatrici')renderOperatrici();else if(t==='tab-andamento')renderAndamento();else if(t==='tab-registrazioni')renderRegistrazioni();},350);
+  _rtTimer=setTimeout(()=>{const t=tabAttivo();if(t==='tab-live')renderLive(nuovoId);else if(t==='tab-operatrici')renderOperatrici();else if(t==='tab-andamento')renderAndamento();else if(t==='tab-registrazioni')renderRegistrazioni();else if(t==='tab-appuntamenti')renderAppuntamenti();},350);
 }
 
 // ── Modal / toast ──
