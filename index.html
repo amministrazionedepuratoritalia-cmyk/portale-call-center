@@ -290,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.0 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.1 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -736,7 +736,7 @@ let _periodoMode='giorno';
 let _squadra='';   // '' = tutte le squadre
 function squadre(){return [...new Set(operatrici.filter(o=>o.ruolo!=='admin'&&o.squadra).map(o=>o.squadra))].sort();}
 function inSquadra(id){return !_squadra||opDi(id).squadra===_squadra;}
-function filtraSquadra(d){return _squadra?{regs:d.regs.filter(r=>inSquadra(r.operatrice_id)),turni:d.turni.filter(t=>inSquadra(t.operatrice_id))}:d;}
+function filtraSquadra(d){return _squadra?{...d,cal:[],regs:d.regs.filter(r=>inSquadra(r.operatrice_id)),turni:d.turni.filter(t=>inSquadra(t.operatrice_id))}:d;}
 function setSquadra(q){_squadra=q;onPeriodoChange();}
 // Selettore «Tutte · Mattino · Pomeriggio» (compare solo se almeno una telefonista ha una squadra)
 function barraSquadre(){const sq=squadre();if(!sq.length)return'';return `<div class="seg seg-full"><button class="${!_squadra?'on':''}" onclick="setSquadra('')">Tutte le squadre</button>${sq.map(q=>`<button class="${_squadra===q?'on':''}" onclick="setSquadra('${esc(q)}')">${esc(q)}</button>`).join('')}</div>`;}
@@ -785,10 +785,11 @@ function onPeriodoChange(){
 async function datiPeriodo(p){
   const k=p.start+'|'+p.end;
   if(_cache[k])return _cache[k];
-  const [regs,turni]=await Promise.all([
+  const [regs,turni,cal]=await Promise.all([
     api(`cc_registrazioni?data=gte.${p.start}&data=lte.${p.end}&solo_calendario=is.false&select=*&order=ora.desc`),
-    api(`cc_turni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=inizio.desc`)]);
-  return _cache[k]={regs,turni};
+    api(`cc_turni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=inizio.desc`),
+    api(`cc_registrazioni?solo_calendario=is.true&data_appuntamento=gte.${p.start}&data_appuntamento=lte.${p.end}&select=*&order=data_appuntamento,ora_appuntamento`)]);
+  return _cache[k]={regs,turni,cal};   // cal = importati da Google con appuntamento nel periodo: solo in elenco, non nei numeri
 }
 function invalidaCache(){Object.keys(_cache).forEach(k=>delete _cache[k]);_trendRegs={};}
 async function avviaAdmin(){
@@ -951,25 +952,25 @@ async function renderAppuntamenti(){
   const el=document.getElementById('tab-appuntamenti'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const app=d.regs.filter(isApp),n=contaDemo(app);
-  const lista=app.filter(r=>!_fDemo||(_fDemo==='da'?!r.demo:r.demo===_fDemo)).sort((a,b)=>(b.data_appuntamento||b.data)+b.ora>(a.data_appuntamento||a.data)+a.ora?1:-1);
+  const app=d.regs.filter(isApp),n=contaDemo(app),cal=(d.cal||[]).filter(r=>isApp(r)&&!app.some(a=>a.id===r.id));
+  const lista=app.concat(cal).filter(r=>!_fDemo||(_fDemo==='da'?!r.demo:r.demo===_fDemo)).sort((a,b)=>(b.data_appuntamento||b.data)+hm(b.ora_appuntamento)+b.ora>(a.data_appuntamento||a.data)+hm(a.ora_appuntamento)+a.ora?1:-1);
   el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()} · appuntamenti presi</div>
     <div class="metrics"><div class="metric"><div class="val">${n.app}</div><div class="lbl">Appuntamenti presi</div></div><div class="metric" style="border-top:3px solid var(--green-sys)"><div class="val c-green">${n.fatte}</div><div class="lbl">Demo fatte</div>${n.app?`<div class="sub">${pct(n.fatte,n.app)}% degli appuntamenti</div>`:''}</div><div class="metric" style="border-top:3px solid var(--red-sys)"><div class="val c-red">${n.non}</div><div class="lbl">Demo non fatte</div></div><div class="metric" style="border-top:3px solid var(--text4)"><div class="val">${n.da}</div><div class="lbl">Demo da fare</div></div></div>
     <div class="seg seg-full"><button class="${!_fDemo?'on':''}" onclick="_fDemo='';renderAppuntamenti()">Tutti</button><button class="${_fDemo==='da'?'on':''}" onclick="_fDemo='da';renderAppuntamenti()">Da fare</button><button class="${_fDemo==='fatta'?'on':''}" onclick="_fDemo='fatta';renderAppuntamenti()">Fatte</button><button class="${_fDemo==='non_fatta'?'on':''}" onclick="_fDemo='non_fatta';renderAppuntamenti()">Non fatte</button></div>
-    <div class="muted" style="padding:0 4px 8px">Premi <b>Demo fatta</b> o <b>Non fatta</b> su ogni appuntamento: le telefoniste lo vedono subito nella loro scheda Appuntamenti.</div>
+    <div class="muted" style="padding:0 4px 8px">Premi <b>Demo fatta</b> o <b>Non fatta</b> su ogni appuntamento: le telefoniste lo vedono subito nella loro scheda Appuntamenti.${cal.length?` In elenco anche <b>${cal.length}</b> con etichetta <span class="pill bg-gray c-gray">solo calendario</span>: vengono da Google Calendar, l'appuntamento cade in questo periodo ma non entrano nei numeri qui sopra (erano già nei report).`:''}</div>
     <div class="card card-flush">${lista.length?lista.slice(0,400).map(rigaApp).join(''):'<div class="empty">Nessun appuntamento qui.</div>'}</div>${lista.length>400?'<div class="muted" style="padding:8px 4px">Mostrati i primi 400: restringi il periodo.</div>':''}`;
 }
 function rigaApp(r){
   const t=tipoDi(r.tipo_codice),o=opDi(r.operatrice_id);
   return `<div class="row" id="app-${r.id}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
-    <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b> · ${esc(o.nome)} · ${esc(t.fonte||t.nome)}</div>
+    <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b>${o.senza?'':' · '+esc(o.nome)} · ${esc(t.fonte||t.nome)}${r.solo_calendario?' <span class="pill bg-gray c-gray">solo calendario</span>':''}</div>
     <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.venditore?'demo di '+r.venditore:'',r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
     <div class="demo-seg"><button class="btn btn-xs" title="Apri nel calendario" onclick="apriEvento(${r.id})"><i class="ti ti-calendar"></i></button><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}</div></div>`;
 }
 async function setDemo(id,v){
   try{
     await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});
-    Object.values(_cache).forEach(c=>c.regs.forEach(r=>{if(r.id===id){r.demo=v;r.demo_data=v?oggiIso():null;}}));
+    Object.values(_cache).forEach(c=>c.regs.concat(c.cal||[]).forEach(r=>{if(r.id===id){r.demo=v;r.demo_data=v?oggiIso():null;}}));
     renderAppuntamenti();toast(v==='fatta'?'Demo segnata come fatta':v==='non_fatta'?'Demo segnata come non fatta':'Rimessa tra quelle da fare');
   }catch(e){toast('Errore: '+e.message);}
 }
@@ -1226,7 +1227,7 @@ function calClickGiorno(ev,g){if(_calVista==='mese'&&(!_calEdit||window.matchMed
 function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarget.getBoundingClientRect().top;const h=CAL_H0+Math.floor(y/CAL_HH),m=Math.floor((y%CAL_HH)/(CAL_HH/2))*30;apriEvento(null,g,`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 // Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
 function apriEvento(id,data,ora){
-  const e=id?(_calEvs.find(x=>x.id===id)||Object.values(_cache).flatMap(c=>c.regs).find(x=>x.id===id)):null;
+  const e=id?(_calEvs.find(x=>x.id===id)||Object.values(_cache).flatMap(c=>c.regs.concat(c.cal||[])).find(x=>x.id===id)):null;
   if(id&&!e)return toast('Appuntamento non trovato');
   const ro=!_calEdit&&currentUser?.ruolo!=='admin';
   const appTipi=tipiAttivi().filter(t=>t.gruppo==='appuntamenti');
