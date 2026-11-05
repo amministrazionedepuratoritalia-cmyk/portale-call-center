@@ -13,13 +13,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 const TZ = "Europe/Rome";
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 // Configurazione: dalle variabili d'ambiente oppure dalla tabella cc_sync_state (protetta da RLS, la legge solo la chiave di servizio)
-let SA: any = {}, CAL_ID = "", HOOK_SECRET = "", FONTE_DEFAULT = "app_cc", IMPORTATO_IL = "", IMPORTA_DA = "", _cfgAt = 0;
+let SA: any = {}, CAL_ID = "", HOOK_SECRET = "", FONTE_DEFAULT = "app_cc", IMPORTATO_IL = "", IMPORTA_DA = "", SCRIVI = false, _cfgAt = 0;
 async function config() {
   if (Date.now() - _cfgAt < 60000 && HOOK_SECRET) return;
   const righe = (await sb.from("cc_sync_state").select("k,v")).data || [];
   const cfg = (k: string) => Deno.env.get(k) || righe.find((r: any) => r.k === k)?.v || "";
   SA = JSON.parse(cfg("GCAL_SERVICE_ACCOUNT") || "{}"); CAL_ID = cfg("GCAL_CALENDAR_ID"); HOOK_SECRET = cfg("GCAL_HOOK_SECRET"); FONTE_DEFAULT = cfg("GCAL_FONTE_DEFAULT") || "app_cc";
-  IMPORTATO_IL = cfg("GCAL_IMPORTATO_IL"); IMPORTA_DA = cfg("GCAL_IMPORTA_DA");
+  IMPORTATO_IL = cfg("GCAL_IMPORTATO_IL"); IMPORTA_DA = cfg("GCAL_IMPORTA_DA"); SCRIVI = cfg("GCAL_SCRIVI") === "1";   // scrittura portale → Google: spenta salvo GCAL_SCRIVI = 1
   _cfgAt = Date.now();
 }
 
@@ -150,6 +150,10 @@ const uguale = (a: any, b: any) => ["summary", "location", "description"].every(
 async function push(tipo: string, record: any, old: any) {
   const r = record || old;
   if (!r || !isApp(r.tipo_codice) && !(old && isApp(old.tipo_codice))) return "non è un appuntamento";
+  // REGOLA (Davide 05/11): gli eventi nati su Google Calendar non si toccano mai: né modifiche né cancellazioni
+  if (r.origine === "google" || old?.origine === "google") return "nato su Google: non si tocca";
+  // e la scrittura verso Google (anche per gli appuntamenti nati nel portale) è spenta finché Davide non la vuole
+  if (!SCRIVI) return "scrittura su Google spenta";
   // riga appena creata dal pull (l'evento esiste già su Google): lo lascio com'è
   if (tipo === "INSERT" && record?.google_event_id) return "arrivato da Google";
   // cancellato, o tolto dal calendario (niente data): elimino l'evento Google
@@ -198,6 +202,21 @@ function noteDa(desc: string) {
   return m ? m[1].trim() : null;
 }
 const senzaTag = (s: any) => String(s ?? "").replace(/\s*(·\s*)?creato da Google Calendar\s*$/, "").trim();
+// La telefonista è scritta nelle note dell'evento come «Cognome I.» (Mesiano E., Molina I., Monti G, Carletti D.) o nome e cognome per esteso.
+// Serve cognome + iniziale (o il nome completo): il solo nome di battesimo non basta, nelle note c'è anche il nome della promoter.
+const esc_ = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function telefonistaDa(testo: string): Op | null {
+  const t = (testo || "").replace(/<[^>]+>/g, " ");
+  const trovate = _ops.filter((o) => {
+    const parole = o.nome.trim().split(/\s+/).filter((w) => w.length >= 2);
+    if (parole.length < 2) return false;
+    const rx: string[] = [];
+    parole.forEach((w, i) => { if (w.length < 4) return; parole.forEach((z, j) => { if (i !== j) rx.push(`\\b${esc_(w)}\\s*${esc_(z[0])}\\.?(?![a-zà-ÿ])`); }); });
+    rx.push(`\\b${parole.map(esc_).join("\\s+")}\\b`, `\\b${parole.slice().reverse().map(esc_).join("\\s+")}\\b`);
+    return rx.some((r) => new RegExp(r, "i").test(t));
+  });
+  return trovate.length === 1 ? trovate[0] : null;
+}
 async function applica(ev: any, riga: any) {
   if (ev.status === "cancelled") {
     // importato (solo calendario) cancellato su Google: via anche dal portale, non era nelle statistiche
@@ -218,6 +237,9 @@ async function applica(ev: any, riga: any) {
   if (tel !== null) agg.telefono = tel || null;
   if (ven !== null) agg.venditore = ven || null;
   if (note !== null) agg.note = note || null;
+  // telefonista dalle note (solo se la riga non ce l'ha già)
+  const opNote = telefonistaDa(desc + "\n" + sum);
+  if (opNote && !riga?.operatrice_id) agg.operatrice_id = opNote.id;
   if (riga) {
     const cambia = Object.keys(agg).some((k) => {
       if (k === "google_sync_at" || k === "google_event_id") return false;
@@ -233,10 +255,17 @@ async function applica(ev: any, riga: any) {
   if (isPromemoria(sum)) return "promemoria, non un appuntamento";
   // evento nuovo creato direttamente su Google: diventa un appuntamento preso (senza telefonista, salvo "Telefonista: Nome").
   // Se era già su Google prima del collegamento (GCAL_IMPORTATO_IL) sta solo nel calendario: nelle statistiche c'è già, dai report.
-  const tf = campo(desc, "Telefonista"); const op = tf ? _ops.find((o) => o.nome.toLowerCase().startsWith(tf.toLowerCase().split(" ")[0])) : null;
+  const tf = campo(desc, "Telefonista"); const op = (tf ? _ops.find((o) => o.nome.toLowerCase().startsWith(tf.toLowerCase().split(" ")[0])) : null) || opNote;
   const creato = ev.created ? locale(ev.created) : { data: new Date().toISOString().slice(0, 10) };
+  // stesso appuntamento già registrato nel portale (stessa data e stesso telefono o stesso cliente)? lo collego invece di crearne un altro
+  if (agg.data_appuntamento) {
+    const cand = (await sb.from("cc_registrazioni").select("*").eq("origine", "portale").is("google_event_id", null).eq("data_appuntamento", agg.data_appuntamento).like("tipo_codice", "app_%")).data || [];
+    const norm = (x: any) => String(x ?? "").toLowerCase().replace(/[^a-z0-9à-ÿ]/g, "");
+    const stesso = cand.find((c: any) => (agg.telefono && norm(c.telefono) === norm(agg.telefono)) || (cliente && norm(c.cliente) && norm(c.cliente) === norm(cliente)));
+    if (stesso) { await sb.from("cc_registrazioni").update({ ...agg, origine: "google", note: stesso.note || agg.note || null }).eq("id", stesso.id); return "collegato all'appuntamento del portale #" + stesso.id; }
+  }
   const soloCal = !!IMPORTATO_IL && !!ev.created && new Date(ev.created).getTime() < new Date(IMPORTATO_IL).getTime();
-  const ins = { ...agg, tipo_codice: fonteDa(ev), operatrice_id: op?.id || null, data: creato.data, ora: ev.created || new Date().toISOString(), solo_calendario: soloCal,
+  const ins = { ...agg, origine: "google", tipo_codice: fonteDa(ev), operatrice_id: op?.id || null, data: creato.data, ora: ev.created || new Date().toISOString(), solo_calendario: soloCal,
     note: soloCal ? agg.note || null : [agg.note, "creato da Google Calendar"].filter(Boolean).join(" · ") };
   const { data, error } = await sb.from("cc_registrazioni").insert(ins).select("id").single();
   if (error) throw error;
@@ -298,6 +327,18 @@ Deno.serve(async (req) => {
     await base();
     const url = new URL(req.url);
     if (url.searchParams.get("mode") === "pull") { const esiti = await pull(); return Response.json({ ok: true, esiti }); }
+    if (url.searchParams.get("mode") === "ripristina") {   // una tantum: rimette la descrizione originale (salvata nelle note) e toglie il colore messo dal portale
+      const id = Number(url.searchParams.get("id"));
+      const riga = (await sb.from("cc_registrazioni").select("*").eq("id", id).maybeSingle()).data;
+      if (!riga?.google_event_id) return Response.json({ ok: false, errore: "riga senza evento" });
+      const prima = await gapi("/events/" + riga.google_event_id);
+      const corpo: any = { description: senzaTag(riga.note) };
+      const colore = url.searchParams.get("colore"); if (colore) corpo.colorId = colore;   // il colore non si tocca, salvo richiesta esplicita
+      try { await gapi("/events/" + riga.google_event_id, "PATCH", { ...corpo, extendedProperties: { private: { cc_id: null } } }); }
+      catch (_e) { await gapi("/events/" + riga.google_event_id, "PATCH", corpo); }
+      const dopo = await gapi("/events/" + riga.google_event_id);
+      return Response.json({ ok: true, prima: { summary: prima.summary, description: prima.description, colorId: prima.colorId }, dopo: { summary: dopo.summary, description: dopo.description, colorId: dopo.colorId } });
+    }
     const body = await req.json().catch(() => ({}));
     const esito = await push(body.type, body.record, body.old_record);
     return Response.json({ ok: true, esito });
