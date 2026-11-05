@@ -290,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.8 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.9 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -364,6 +364,7 @@
     <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Telefoniste</div>
     <div class="tab" onclick="switchTab(this,'tab-andamento');renderAndamento()"><i class="ti ti-chart-bar"></i> Andamento</div>
     <div class="tab" onclick="switchTab(this,'tab-calendario');renderCalendario(document.getElementById('tab-calendario'),true)"><i class="ti ti-calendar"></i> Calendario</div>
+    <div class="tab" onclick="switchTab(this,'tab-lavagna');renderLavagna()"><i class="ti ti-chalkboard"></i> Lavagna</div>
     <div class="tab" onclick="switchTab(this,'tab-appuntamenti');renderAppuntamenti()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
     <div class="tab" onclick="switchTab(this,'tab-registrazioni');renderRegistrazioni()"><i class="ti ti-list"></i> Registrazioni</div>
     <div class="tab" onclick="switchTab(this,'tab-gestione');renderGestione()"><i class="ti ti-settings"></i> Gestione</div>
@@ -373,6 +374,7 @@
     <div id="tab-operatrici" class="hidden"></div>
     <div id="tab-andamento" class="hidden"></div>
     <div id="tab-calendario" class="hidden"></div>
+    <div id="tab-lavagna" class="hidden"></div>
     <div id="tab-appuntamenti" class="hidden"></div>
     <div id="tab-registrazioni" class="hidden"></div>
     <div id="tab-gestione" class="hidden"></div>
@@ -1255,6 +1257,17 @@ async function salvaEvento(id){
 }
 async function eliminaEvento(id){if(!confirm('Eliminare questo appuntamento? Sparisce anche dalle statistiche.'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'DELETE');chiudiModal();invalidaCache();renderCalendario();onPeriodoChange();}catch(e){toast('Errore: '+e.message);}}
 async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});invalidaCache();chiudiModal();renderCalendario();toast('Demo aggiornata');}catch(e){toast('Errore: '+e.message);}}
+
+// ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
+let _lavSett=null;
+function renderLavagna(){
+  const el=document.getElementById('tab-lavagna');if(!_lavSett)_lavSett=lunediDi(oggiIso());
+  const tvUrl=new URL('tv.html',location.href).href;
+  el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSett=lunediDi(oggiIso());renderLavagna()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,-7);renderLavagna()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,7);renderLavagna()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSett)}</div>
+      <a class="btn btn-sm" href="${tvUrl}" target="_blank"><i class="ti ti-device-tv"></i> Apri la pagina per la TV</a></div>
+    <div class="muted" style="padding:0 4px 8px">Si aggiorna da sola con gli appuntamenti del calendario. Per la TV in ufficio apri «Apri la pagina per la TV» a schermo intero: a sinistra il calendario, a destra la lavagna.</div>
+    <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSett}" style="width:100%;height:calc(100vh - 230px);min-height:560px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+}
 
 // ── Modal / toast ──
 function apriModal(html){document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)chiudiModal()"><div class="modal"><div class="modal-grab"></div>${html}</div></div>`;}
