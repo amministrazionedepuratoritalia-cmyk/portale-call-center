@@ -104,6 +104,14 @@ function tipoPerFonte(nome: string) {
     _tipi.find((x) => x.gruppo === "appuntamenti" && (x.fonte || "").toLowerCase().startsWith(n.slice(0, 3))) || null;
 }
 
+// Il titolo su Google dice già le stesse cose della riga (cliente, telefono, venditore, fonte)?
+function titoloEquivale(summary: string, r: any) {
+  if (!summary || summary.includes(" · ")) return false;
+  const t = daTitolo(summary), tf = t.fonte ? tipoPerFonte(t.fonte) : null;
+  const same = (a: any, b: any) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+  return same(t.cliente, r.cliente) && same(t.telefono, r.telefono) && same(t.venditore, r.venditore) && (tf ? tf.codice === r.tipo_codice : r.tipo_codice === "app_altro");
+}
+
 // ── portale → Google: come deve apparire l'evento (titolo nel formato dell'ufficio) ──
 function eventoDa(r: any) {
   const t = tipoDi(r.tipo_codice), op = opDi(r.operatrice_id);
@@ -150,6 +158,8 @@ async function push(tipo: string, record: any, old: any) {
     let esistente: any = null;
     try { esistente = await gapi("/events/" + record.google_event_id); } catch (e: any) { if (e.status !== 404 && e.status !== 410) throw e; }
     if (esistente && esistente.status !== "cancelled") {
+      // il titolo scritto dall'ufficio (es. «TO riconf.CC - Nome 333…») resta com'è finché cliente, telefono, venditore e fonte non cambiano nel portale
+      if (titoloEquivale(esistente.summary, record)) voluto.summary = esistente.summary;
       if (uguale(esistente, voluto)) return "già allineato";
       await gapi("/events/" + record.google_event_id, "PATCH", voluto);
       await sb.from("cc_registrazioni").update({ google_sync_at: new Date().toISOString() }).eq("id", record.id);
