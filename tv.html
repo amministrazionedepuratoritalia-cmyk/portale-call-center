@@ -46,14 +46,14 @@
     .blk b { display:block; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .blk.fatta { opacity:.6; }
     /* settimana piena (più di 10 appuntamenti in un giorno): elenco per giorno, leggibile da lontano */
-    .cal.agenda { grid-template-columns:repeat(6,1fr); grid-template-rows:1fr; }
-    .ag-col { display:flex; flex-direction:column; min-height:0; border-left:0.5px solid var(--sep); }
+    .cal.agenda { grid-template-columns:repeat(6,minmax(0,1fr)); grid-template-rows:minmax(0,1fr); }
+    .ag-col { display:flex; flex-direction:column; min-height:0; min-width:0; border-left:0.5px solid var(--sep); }
     .ag-col:first-child { border-left:none; }
     .ag-col.today { background:#F7FAFF; }
     .ag-col .cal-wh { border-left:none; }
     .ag-col .k { font-size:10px; color:var(--text3); margin-top:2px; }
     .ag-list { flex:1; min-height:0; overflow:hidden; padding:3px 4px; display:flex; flex-direction:column; gap:2px; }
-    .ag-ev { display:flex; align-items:baseline; gap:5px; border-left:4px solid; border-radius:4px; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.05); padding:1px 5px; font-size:var(--ag-fs,12px); line-height:1.25; white-space:nowrap; overflow:hidden; }
+    .ag-ev { display:flex; align-items:baseline; gap:5px; min-width:0; border-left:4px solid; border-radius:4px; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.05); padding:1px 5px; font-size:var(--ag-fs,12px); line-height:1.25; white-space:nowrap; overflow:hidden; }
     .ag-ev .h { font-weight:700; font-variant-numeric:tabular-nums; flex:none; }
     .ag-ev .c { overflow:hidden; text-overflow:ellipsis; font-weight:600; }
     .ag-ev .v { color:var(--text3); font-size:.9em; overflow:hidden; text-overflow:ellipsis; flex:none; max-width:38%; }
