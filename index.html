@@ -171,6 +171,31 @@
     .demo-seg { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; flex-shrink:0; }
     .op-demo { display:flex; align-items:center; gap:8px; padding:8px 0 10px; border-top:0.5px solid var(--sep); font-size:13px; }
     .op-demo b { font-size:16px; }
+    /* ── CALENDARIO (stile Google Calendar) ── */
+    .cal-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    .cal-title { font-size:18px; font-weight:700; letter-spacing:-.4px; flex:1; min-width:150px; }
+    .cal-month { display:grid; grid-template-columns:repeat(7,1fr); background:var(--surface); border-radius:13px; overflow:hidden; box-shadow:var(--sh-xs); }
+    .cal-dow { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; color:var(--text3); text-align:center; padding:8px 0; border-bottom:0.5px solid var(--sep); }
+    .cal-cell { min-height:98px; border-right:0.5px solid var(--sep); border-bottom:0.5px solid var(--sep); padding:4px; cursor:pointer; overflow:hidden; }
+    .cal-cell:nth-child(7n+7) { border-right:none; }
+    .cal-cell.other { background:var(--surface2); } .cal-cell.other .cal-num { color:var(--text4); }
+    .cal-num { font-size:12px; font-weight:600; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; margin-bottom:2px; }
+    .cal-cell.today .cal-num { background:var(--blue); color:#fff; }
+    .cal-ev { font-size:11px; line-height:1.25; padding:2px 5px; border-radius:5px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; border-left:3px solid; color:var(--text); }
+    .cal-more { font-size:11px; color:var(--text3); padding:0 5px; }
+    .cal-week { display:grid; grid-template-columns:46px repeat(var(--cols,7),1fr); background:var(--surface); border-radius:13px; box-shadow:var(--sh-xs); overflow:hidden; }
+    .cal-wh { padding:8px 4px; text-align:center; border-bottom:0.5px solid var(--sep); border-left:0.5px solid var(--sep); }
+    .cal-wh .d { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.3px; }
+    .cal-wh .n { font-size:18px; font-weight:700; width:30px; height:30px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; }
+    .cal-wh.today .n { background:var(--blue); color:#fff; }
+    .cal-allday { min-height:28px; border-left:0.5px solid var(--sep); border-bottom:0.5px solid var(--sep); padding:2px; cursor:pointer; }
+    .cal-gutter { font-size:10px; color:var(--text3); position:relative; }
+    .cal-col { position:relative; border-left:0.5px solid var(--sep); cursor:pointer; background-image:linear-gradient(to bottom, rgba(0,0,0,0.07) 0.5px, transparent 0.5px); background-size:100% 44px; }
+    .cal-block { position:absolute; left:2px; right:2px; border-radius:6px; padding:3px 6px; font-size:11px; line-height:1.25; overflow:hidden; border-left:3px solid; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.10); color:var(--text); }
+    .cal-block b { display:block; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-now { position:absolute; left:0; right:0; height:2px; background:var(--red-sys); z-index:2; pointer-events:none; }
+    .cal-now::before { content:''; position:absolute; left:-4px; top:-3px; width:8px; height:8px; border-radius:50%; background:var(--red-sys); }
+    @media(max-width:700px){ .cal-cell { min-height:64px; padding:2px; } .cal-ev { font-size:9px; padding:1px 3px; } .cal-title { font-size:15px; } }
     .fonte-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:14px; }
     .fonte-card { background:var(--surface); border-radius:16px; box-shadow:var(--sh-xs); padding:12px 14px 6px; }
     .fonte-head { display:flex; align-items:center; gap:10px; padding-bottom:8px; }
@@ -265,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.7 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.8 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -286,6 +311,7 @@
   <div class="nav-tabs">
     <div class="tab active" onclick="switchTab(this,'op-tab-oggi')"><i class="ti ti-headset"></i> Oggi</div>
     <div class="tab" onclick="switchTab(this,'op-tab-app');loadAppOp()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
+    <div class="tab" onclick="switchTab(this,'op-tab-cal');renderCalendario(document.getElementById('op-cal'),false)"><i class="ti ti-calendar"></i> Calendario</div>
     <div class="tab" onclick="switchTab(this,'op-tab-storico');loadStoricoOp()"><i class="ti ti-history"></i> Storico</div>
   </div>
   <div class="page-content">
@@ -297,6 +323,7 @@
       <div class="section-title">Oggi, in ordine di tempo</div>
       <div class="card card-flush" id="op-lista"></div>
     </div>
+    <div id="op-tab-cal" class="hidden"><div id="op-cal"></div></div>
     <div id="op-tab-app" class="hidden">
       <div class="flex" style="margin-bottom:12px"><select id="op-app-mese" onchange="loadAppOp()"></select></div>
       <div id="op-app"></div>
@@ -336,6 +363,7 @@
     <div class="tab active" onclick="switchTab(this,'tab-live');renderLive()"><i class="ti ti-broadcast"></i> Adesso</div>
     <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Telefoniste</div>
     <div class="tab" onclick="switchTab(this,'tab-andamento');renderAndamento()"><i class="ti ti-chart-bar"></i> Andamento</div>
+    <div class="tab" onclick="switchTab(this,'tab-calendario');renderCalendario(document.getElementById('tab-calendario'),true)"><i class="ti ti-calendar"></i> Calendario</div>
     <div class="tab" onclick="switchTab(this,'tab-appuntamenti');renderAppuntamenti()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
     <div class="tab" onclick="switchTab(this,'tab-registrazioni');renderRegistrazioni()"><i class="ti ti-list"></i> Registrazioni</div>
     <div class="tab" onclick="switchTab(this,'tab-gestione');renderGestione()"><i class="ti ti-settings"></i> Gestione</div>
@@ -344,6 +372,7 @@
     <div id="tab-live"><div class="loading"><div class="spinner"></div>Carico…</div></div>
     <div id="tab-operatrici" class="hidden"></div>
     <div id="tab-andamento" class="hidden"></div>
+    <div id="tab-calendario" class="hidden"></div>
     <div id="tab-appuntamenti" class="hidden"></div>
     <div id="tab-registrazioni" class="hidden"></div>
     <div id="tab-gestione" class="hidden"></div>
@@ -622,7 +651,7 @@ function renderListaOp(){
   el.innerHTML=regOggi.map(r=>{const t=tipoDi(r.tipo_codice);return`<div class="row" id="reg-${r.id}">
       <div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div>
       <div class="row-body"><div class="row-title">${esc(t.nome)}${r.cliente?` · <b>${esc(r.cliente)}</b>`:''}</div>
-        <div class="row-sub">${[r.telefono,r.data_appuntamento?'app. '+ddmmyyyy(r.data_appuntamento):'',r.note].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div>
+        <div class="row-sub">${[r.telefono,r.data_appuntamento?'app. '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' '+hm(r.ora_appuntamento):''):'',r.indirizzo,r.note].filter(Boolean).map(esc).join(' · ')||'&nbsp;'}</div></div>
       ${isApp(r)&&r.demo?demoBadge(r):''}<span class="row-time">${hhmm(r.ora)}</span>
       <button class="btn btn-icon btn-sm" title="Elimina" onclick="eliminaRegOp(${r.id})"><i class="ti ti-x"></i></button>
     </div>`;}).join('');
@@ -653,14 +682,15 @@ function apriDettaglio(t){
   apriModal(`<h2>${esc(t.nome)}</h2><div class="muted">Compila quello che sai, il resto puoi lasciarlo vuoto.</div>
     <label>Cliente</label><input id="d-cliente" placeholder="Nome e cognome" autocomplete="off">
     <label>Telefono</label><input id="d-telefono" inputmode="tel" placeholder="Numero">
-    <label>${isApp?'Data appuntamento':'Data (richiamo / appuntamento)'}</label><input type="date" id="d-dataapp">
-    <label>Note</label><textarea id="d-note" rows="2" placeholder="Zona, orario, cosa ha detto…"></textarea>
+    <div class="two-col"><div><label>${isApp?'Data appuntamento':'Data (richiamo / appuntamento)'}</label><input type="date" id="d-dataapp"></div><div><label>Ora</label><input type="time" id="d-oraapp" step="900"></div></div>
+    <label>Indirizzo</label><input id="d-indirizzo" placeholder="Via, città">
+    <label>Note</label><textarea id="d-note" rows="2" placeholder="Cosa ha detto, preferenze…"></textarea>
     <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaDettaglio('${t.codice}')"><i class="ti ti-check"></i> Registra</button></div>`);
   setTimeout(()=>document.getElementById('d-cliente')?.focus(),250);
 }
 async function salvaDettaglio(codice){
   const v=id=>document.getElementById(id).value.trim();
-  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,note:v('d-note')||null});
+  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,ora_appuntamento:v('d-oraapp')||null,indirizzo:v('d-indirizzo')||null,note:v('d-note')||null});
   if(ok)chiudiModal();
 }
 async function loadAppOp(){
@@ -674,7 +704,7 @@ async function loadAppOp(){
     <div class="muted" style="padding:0 4px 8px">La demo la segna l'ufficio: qui la vedi e basta.</div>
     ${regs.length?`<div class="card card-flush">${regs.map(r=>{const t=tipoDi(r.tipo_codice);return`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
       <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b> · ${esc(t.fonte||t.nome)}</div>
-      <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento):'preso '+labelGiorno(r.data),r.note].filter(Boolean).map(esc).join(' · ')}</div></div>${demoBadge(r)}</div>`;}).join('')}</div>`:'<div class="empty">Nessun appuntamento in questo mese.</div>'}`;
+      <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.venditore?'demo di '+r.venditore:'',r.note].filter(Boolean).map(esc).join(' · ')}</div></div>${demoBadge(r)}</div>`;}).join('')}</div>`:'<div class="empty">Nessun appuntamento in questo mese.</div>'}`;
 }
 async function loadStoricoOp(){
   const mese=document.getElementById('op-storico-mese').value,el=document.getElementById('op-storico');
@@ -930,8 +960,8 @@ function rigaApp(r){
   const t=tipoDi(r.tipo_codice),o=opDi(r.operatrice_id);
   return `<div class="row" id="app-${r.id}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
     <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b> · ${esc(o.nome)} · ${esc(t.fonte||t.nome)}</div>
-    <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento):'preso '+labelGiorno(r.data),r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
-    <div class="demo-seg"><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}</div></div>`;
+    <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.venditore?'demo di '+r.venditore:'',r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
+    <div class="demo-seg"><button class="btn btn-xs" title="Apri nel calendario" onclick="apriEvento(${r.id})"><i class="ti ti-calendar"></i></button><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}</div></div>`;
 }
 async function setDemo(id,v){
   try{
@@ -1125,8 +1155,106 @@ function onLive(payload){
   invalidaCache();
   const nuovoId=payload?.eventType==='INSERT'&&payload.table==='cc_registrazioni'?payload.new?.id:null;
   clearTimeout(_rtTimer);
-  _rtTimer=setTimeout(()=>{const t=tabAttivo();if(t==='tab-live')renderLive(nuovoId);else if(t==='tab-operatrici')renderOperatrici();else if(t==='tab-andamento')renderAndamento();else if(t==='tab-registrazioni')renderRegistrazioni();else if(t==='tab-appuntamenti')renderAppuntamenti();},350);
+  _rtTimer=setTimeout(()=>{const t=tabAttivo();if(t==='tab-live')renderLive(nuovoId);else if(t==='tab-operatrici')renderOperatrici();else if(t==='tab-andamento')renderAndamento();else if(t==='tab-registrazioni')renderRegistrazioni();else if(t==='tab-appuntamenti')renderAppuntamenti();else if(t==='tab-calendario')renderCalendario();},350);
 }
+
+// ══════════════════════════════════════════════════════════════
+//  CALENDARIO (stile Google Calendar): mese / settimana / giorno, appuntamenti per data e ora
+//  Admin: click su uno spazio libero = nuovo appuntamento, click su un appuntamento = modifica. Telefoniste: solo lettura.
+// ══════════════════════════════════════════════════════════════
+let _calVista=window.matchMedia('(max-width:700px)').matches?'giorno':'sett',_calData=oggiIso(),_calEdit=false,_calEl=null,_calEvs=[];
+const CAL_H0=8,CAL_H1=20,CAL_HH=44;   // ore mostrate e altezza di un'ora in px
+function lunediDi(iso){return isoAddDays(iso,-((isoToDate(iso).getDay()+6)%7));}
+function hm(t){return t?String(t).slice(0,5):'';}
+function minuti(t){if(!t)return null;const[h,m]=String(t).split(':').map(Number);return h*60+m;}
+function calRange(){
+  if(_calVista==='mese'){const p=_calData.split('-').map(Number),first=`${p[0]}-${String(p[1]).padStart(2,'0')}-01`,start=lunediDi(first);return{start,end:isoAddDays(start,41)};}
+  if(_calVista==='sett'){const start=lunediDi(_calData);return{start,end:isoAddDays(start,6)};}
+  return{start:_calData,end:_calData};
+}
+function calTitolo(){const r=calRange();if(_calVista==='mese')return labelMese(_calData.slice(0,7));if(_calVista==='sett')return labelSettimana(r.start);return labelGiornoLungo(_calData)+' '+_calData.slice(0,4);}
+function calNav(dir){if(_calVista==='mese'){const p=_calData.split('-').map(Number);_calData=yyyymmdd(new Date(p[0],p[1]-1+dir,1));}else _calData=isoAddDays(_calData,dir*(_calVista==='sett'?7:1));renderCalendario();}
+function calOggi(){_calData=oggiIso();renderCalendario();}
+function calVista(v){_calVista=v;renderCalendario();}
+async function renderCalendario(target,editable){
+  if(target){_calEl=target;_calEdit=!!editable;}
+  const el=_calEl;if(!el)return;
+  const r=calRange(),cod=[...codiciGruppo('appuntamenti')];
+  if(!cod.length){el.innerHTML='<div class="empty">Nessuna attività di tipo appuntamento.</div>';return;}
+  let evs=[],senza=[];
+  try{
+    [evs,senza]=await Promise.all([
+      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${r.start}&data_appuntamento=lte.${r.end}&select=*&order=data_appuntamento,ora_appuntamento`),
+      _calEdit?api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=is.null&data=gte.${isoAddDays(oggiIso(),-30)}&select=*&order=ora.desc&limit=100`):Promise.resolve([])]);
+  }catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  _calEvs=evs.concat(senza);
+  const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
+  const head=`<div class="cal-head"><button class="btn btn-sm" onclick="calOggi()">Oggi</button><button class="nav-arrow" style="display:inline-flex" onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button><div class="cal-title">${calTitolo()}</div><div class="seg"><button class="${_calVista==='giorno'?'on':''}" onclick="calVista('giorno')">Giorno</button><button class="${_calVista==='sett'?'on':''}" onclick="calVista('sett')">Settimana</button><button class="${_calVista==='mese'?'on':''}" onclick="calVista('mese')">Mese</button></div>${_calEdit?`<button class="btn btn-primary btn-sm" onclick="apriEvento(null,'${_calData}')"><i class="ti ti-plus"></i> Nuovo</button>`:''}</div>
+    ${_calEdit?'<div class="muted" style="padding:0 4px 8px">Clicca su uno spazio libero per inserire un appuntamento, su un appuntamento per modificarlo.</div>':'<div class="muted" style="padding:0 4px 8px">Qui vedi gli appuntamenti di tutte: utile per non sovrapporre gli orari. Li modifica l\'ufficio.</div>'}`;
+  const giorni=[];for(let g=r.start;g<=r.end;g=isoAddDays(g,1))giorni.push(g);
+  let body='';
+  if(_calVista==='mese'){
+    const mese=_calData.slice(0,7);
+    body=`<div class="cal-month">${['lun','mar','mer','gio','ven','sab','dom'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}${giorni.map(g=>{const lista=perG[g]||[];return `<div class="cal-cell${g.slice(0,7)!==mese?' other':''}${g===oggiIso()?' today':''}" onclick="calClickGiorno(event,'${g}')"><div class="cal-num">${isoToDate(g).getDate()}</div>${lista.slice(0,3).map(chipEv).join('')}${lista.length>3?`<div class="cal-more" onclick="event.stopPropagation();_calData='${g}';calVista('giorno')">+${lista.length-3} altri</div>`:''}</div>`;}).join('')}</div>`;
+  }else{
+    const n=giorni.length,H=(CAL_H1-CAL_H0)*CAL_HH,ore=[];for(let h=CAL_H0;h<=CAL_H1;h++)ore.push(h);
+    const adesso=new Date(),minOra=adesso.getHours()*60+adesso.getMinutes();
+    body=`<div class="table-wrap"><div class="cal-week" style="--cols:${n};min-width:${n>1?720:0}px">
+      <div class="cal-wh" style="border-left:none"></div>${giorni.map(g=>`<div class="cal-wh${g===oggiIso()?' today':''}"><div class="d">${GIORNI_BREVI[isoToDate(g).getDay()]}</div><div class="n">${isoToDate(g).getDate()}</div></div>`).join('')}
+      <div class="cal-gutter" style="font-size:9px;padding:6px 4px 0 0;text-align:right;border-bottom:0.5px solid var(--sep)">senza ora</div>${giorni.map(g=>`<div class="cal-allday" onclick="calClickGiorno(event,'${g}')">${(perG[g]||[]).filter(e=>!e.ora_appuntamento).map(chipEv).join('')}</div>`).join('')}
+      <div class="cal-gutter" style="height:${H}px">${ore.map(h=>`<div style="position:absolute;top:${(h-CAL_H0)*CAL_HH-6}px;right:6px">${h}:00</div>`).join('')}</div>
+      ${giorni.map(g=>`<div class="cal-col" style="height:${H}px" onclick="calClickOra(event,'${g}')">${layoutEv((perG[g]||[]).filter(e=>e.ora_appuntamento)).map(blockEv).join('')}${g===oggiIso()&&minOra>=CAL_H0*60&&minOra<=CAL_H1*60?`<div class="cal-now" style="top:${((minOra-CAL_H0*60)*CAL_HH/60).toFixed(0)}px"></div>`:''}</div>`).join('')}
+    </div></div>`;
+  }
+  const listaSenza=_calEdit&&senza.length?`<div class="section-title">Appuntamenti ancora senza data nel calendario · presi negli ultimi 30 giorni (${senza.length})</div><div class="card card-flush">${senza.slice(0,30).map(e=>{const t=tipoDi(e.tipo_codice);return `<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-question"></i></div><div class="row-body"><div class="row-title"><b>${esc(e.cliente||'Cliente non indicato')}</b> · ${esc(opDi(e.operatrice_id).nome)} · ${esc(t.fonte||t.nome)}</div><div class="row-sub">preso ${labelGiorno(e.data)} ${hhmm(e.ora)}${e.telefono?' · '+esc(e.telefono):''}</div></div><button class="btn btn-sm btn-primary" onclick="apriEvento(${e.id},'${oggiIso()}')"><i class="ti ti-calendar-plus"></i> Metti in calendario</button></div>`;}).join('')}${senza.length>30?`<div class="muted" style="padding:8px 14px">e altri ${senza.length-30}…</div>`:''}</div>`:'';
+  el.innerHTML=head+body+listaSenza;
+}
+function chipEv(e){const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue;return `<div class="cal-ev bg-${t.colore}" style="border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</div>`;}
+// Appuntamenti che si sovrappongono nello stesso giorno: affiancati in colonne, come in Google Calendar
+function layoutEv(lista){
+  const evs=lista.map(e=>({e,s:minuti(e.ora_appuntamento),f:minuti(e.ora_appuntamento)+Math.max(30,e.durata_min||60)})).sort((a,b)=>a.s-b.s||a.f-b.f);
+  const out=[];let cluster=[],fine=-1;
+  const chiudi=()=>{if(!cluster.length)return;const cols=[];cluster.forEach(x=>{let c=cols.findIndex(end=>end<=x.s);if(c<0){c=cols.length;cols.push(x.f);}else cols[c]=x.f;x.col=c;});cluster.forEach(x=>{x.ncol=cols.length;out.push(x);});cluster=[];};
+  evs.forEach(x=>{if(x.s>=fine)chiudi();fine=Math.max(fine,x.f);cluster.push(x);});chiudi();
+  return out;
+}
+function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||60)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([o.senza?'':o.nome.split(' ')[0],e.venditore?'→ '+e.venditore:'',e.indirizzo].filter(Boolean).join(' · '))}</div>`;}
+function calClickGiorno(ev,g){if(_calVista==='mese'&&(!_calEdit||window.matchMedia('(max-width:700px)').matches)){_calData=g;calVista('giorno');return;}if(!_calEdit)return;apriEvento(null,g);}
+function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarget.getBoundingClientRect().top;const h=CAL_H0+Math.floor(y/CAL_HH),m=Math.floor((y%CAL_HH)/(CAL_HH/2))*30;apriEvento(null,g,`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
+// Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
+function apriEvento(id,data,ora){
+  const e=id?(_calEvs.find(x=>x.id===id)||Object.values(_cache).flatMap(c=>c.regs).find(x=>x.id===id)):null;
+  if(id&&!e)return toast('Appuntamento non trovato');
+  const ro=!_calEdit&&currentUser?.ruolo!=='admin';
+  const appTipi=tipiAttivi().filter(t=>t.gruppo==='appuntamenti');
+  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||(e&&o.id===e.operatrice_id)));
+  const venditori=[...new Set(_calEvs.map(x=>x.venditore).filter(Boolean))].sort();
+  const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:60,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',note:''};
+  if(e&&data&&!e.data_appuntamento)v.data_appuntamento=data;
+  const dis=ro?'disabled':'';
+  apriModal(`<h2>${id?(ro?'Appuntamento':'Modifica appuntamento'):'Nuovo appuntamento'}</h2>${e?`<div class="muted">Preso ${labelGiorno(e.data)} ${hhmm(e.ora)} da ${esc(opDi(e.operatrice_id).nome)}</div>`:''}
+    <label>Cliente</label><input id="ev-cliente" value="${esc(v.cliente||'')}" placeholder="Nome e cognome" ${dis}>
+    <div class="two-col"><div><label>Telefono</label><input id="ev-telefono" inputmode="tel" value="${esc(v.telefono||'')}" ${dis}></div><div><label>Fonte</label><select id="ev-tipo" ${dis}>${appTipi.map(t=>`<option value="${t.codice}" ${t.codice===v.tipo_codice?'selected':''}>${esc(t.fonte||t.nome)}</option>`).join('')}</select></div></div>
+    <label>Indirizzo</label><input id="ev-indirizzo" value="${esc(v.indirizzo||'')}" placeholder="Via, città" ${dis}>
+    <div class="two-col"><div><label>Data</label><input type="date" id="ev-data" value="${v.data_appuntamento||''}" ${dis}></div><div><label>Ora</label><input type="time" id="ev-ora" value="${hm(v.ora_appuntamento)}" step="900" ${dis}></div></div>
+    <div class="two-col"><div><label>Durata (minuti)</label><input type="number" id="ev-durata" value="${v.durata_min||60}" min="15" step="15" ${dis}></div><div><label>Venditore (chi fa la demo)</label><input id="ev-venditore" value="${esc(v.venditore||'')}" list="venditori-list" ${dis}><datalist id="venditori-list">${venditori.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div></div>
+    <label>Telefonista</label><select id="ev-op" ${dis}><option value="">— senza telefonista —</option>${ops.map(o=>`<option value="${o.id}" ${o.id===v.operatrice_id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
+    <label>Note</label><textarea id="ev-note" rows="2" ${dis}>${esc(v.note||'')}</textarea>
+    ${e?`<div class="flex wrap" style="margin-top:14px;gap:6px">${demoBadge(e)}${ro?'':`<button class="btn btn-xs btn-success" onclick="setDemoCal(${e.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs btn-danger" onclick="setDemoCal(${e.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${e.demo?`<button class="btn btn-xs" onclick="setDemoCal(${e.id},null)">Da fare</button>`:''}`}</div>`:''}
+    <div class="modal-actions">${e&&!ro?`<button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="eliminaEvento(${e.id})">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">${ro?'Chiudi':'Annulla'}</button>${ro?'':`<button class="btn btn-primary" onclick="salvaEvento(${id||'null'})"><i class="ti ti-check"></i> Salva</button>`}</div>`);
+  if(!ro)setTimeout(()=>document.getElementById('ev-cliente')?.focus(),250);
+}
+async function salvaEvento(id){
+  const v=i=>document.getElementById(i).value.trim();
+  const body={cliente:v('ev-cliente')||null,telefono:v('ev-telefono')||null,indirizzo:v('ev-indirizzo')||null,data_appuntamento:v('ev-data')||null,ora_appuntamento:v('ev-ora')||null,durata_min:+v('ev-durata')||60,tipo_codice:v('ev-tipo'),venditore:v('ev-venditore')||null,note:v('ev-note')||null,operatrice_id:v('ev-op')?+v('ev-op'):null};
+  try{
+    if(id)await api(`cc_registrazioni?id=eq.${id}`,'PATCH',body);
+    else await api('cc_registrazioni','POST',{...body,data:oggiIso(),ora:new Date().toISOString()});
+    chiudiModal();invalidaCache();if(_calEl&&!document.getElementById(_calEl.id).classList.contains('hidden'))renderCalendario();else onPeriodoChange();toast('Salvato');
+  }catch(e){toast('Errore: '+e.message);}
+}
+async function eliminaEvento(id){if(!confirm('Eliminare questo appuntamento? Sparisce anche dalle statistiche.'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'DELETE');chiudiModal();invalidaCache();renderCalendario();onPeriodoChange();}catch(e){toast('Errore: '+e.message);}}
+async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});invalidaCache();chiudiModal();renderCalendario();toast('Demo aggiornata');}catch(e){toast('Errore: '+e.message);}}
 
 // ── Modal / toast ──
 function apriModal(html){document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)chiudiModal()"><div class="modal"><div class="modal-grab"></div>${html}</div></div>`;}

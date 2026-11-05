@@ -45,6 +45,10 @@ create table if not exists cc_registrazioni (
   cliente           text,
   telefono          text,
   data_appuntamento date,
+  ora_appuntamento  time,
+  durata_min        int         not null default 60,
+  indirizzo         text,
+  venditore         text,                                      -- chi fa la demo
   note              text,
   demo              text check (demo in ('fatta','non_fatta')),  -- segnata dall'admin sugli appuntamenti
   demo_data         date,
