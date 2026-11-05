@@ -17,6 +17,10 @@ create or replace function cc_gcal_notifica() returns trigger language plpgsql s
 declare
   corpo jsonb;
 begin
+  -- aggiornamenti che toccano solo le colonne google_* (scritte dalla funzione stessa): niente chiamata, altrimenti si fa un ciclo
+  if tg_op = 'UPDATE' and (to_jsonb(new) - 'google_event_id' - 'google_sync_at') = (to_jsonb(old) - 'google_event_id' - 'google_sync_at') then
+    return null;
+  end if;
   corpo := jsonb_build_object('type', tg_op, 'table', tg_table_name, 'record', case when tg_op = 'DELETE' then null else to_jsonb(new) end,
                               'old_record', case when tg_op = 'INSERT' then null else to_jsonb(old) end);
   perform net.http_post(

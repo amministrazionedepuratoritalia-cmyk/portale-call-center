@@ -101,8 +101,11 @@ function eventoDa(r: any) {
   } else { ev.start = { date: r.data_appuntamento }; ev.end = { date: addDays(r.data_appuntamento, 1) }; }
   return ev;
 }
-const uguale = (a: any, b: any) => ["summary", "location", "description"].every((k) => (a[k] || "") === (b[k] || "")) &&
-  JSON.stringify(a.start) === JSON.stringify(b.start) && JSON.stringify(a.end) === JSON.stringify(b.end);
+function istante(x: any) { if (!x) return ""; if (x.date) return "D" + x.date; const s = String(x.dateTime); return /[+-]\d\d:\d\d$|Z$/.test(s) ? String(new Date(s).getTime()) : String(new Date(s + romaOffset(s)).getTime()); }
+// offset di Europe/Rome per un dateTime senza fuso (es. 2026-11-06T11:00:00): +01:00 o +02:00
+function romaOffset(s: string) { const d = new Date(s + "Z"); const p = new Intl.DateTimeFormat("en-US", { timeZone: TZ, timeZoneName: "longOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName")?.value || "GMT+01:00"; const m = p.match(/([+-])(\d\d):(\d\d)/); return m ? m[1] + m[2] + ":" + m[3] : "+01:00"; }
+const uguale = (a: any, b: any) => ["summary", "location", "description"].every((k) => (a[k] || "").trim() === (b[k] || "").trim()) &&
+  istante(a.start) === istante(b.start) && istante(a.end) === istante(b.end);
 
 async function push(tipo: string, record: any, old: any) {
   const r = record || old;
