@@ -327,6 +327,46 @@ Deno.serve(async (req) => {
     await base();
     const url = new URL(req.url);
     if (url.searchParams.get("mode") === "pull") { const esiti = await pull(); return Response.json({ ok: true, esiti }); }
+    if (url.searchParams.get("mode") === "ispeziona") {   // una tantum: cosa ha toccato il portale su Google da un certo istante (creati dal service account o con la nostra firma)
+      const da = url.searchParams.get("da") || new Date(Date.now() - 6 * 3600000).toISOString();
+      const out: any[] = []; let pageToken = "";
+      for (let giro = 0; giro < 10; giro++) {
+        const q = new URLSearchParams({ updatedMin: da, showDeleted: "true", singleEvents: "true", maxResults: "250" }); if (pageToken) q.set("pageToken", pageToken);
+        const res = await gapi("/events?" + q.toString());
+        for (const ev of res.items || []) {
+          const nostro = (ev.creator?.email || "") === SA.client_email, firma = (ev.description || "").includes("Portale Call Center");
+          if (nostro || firma) out.push({ id: ev.id, status: ev.status, summary: ev.summary, start: ev.start?.dateTime || ev.start?.date, creator: ev.creator?.email, updated: ev.updated, created: ev.created, firma, descr: (ev.description || "").slice(0, 160), colorId: ev.colorId });
+        }
+        if (!res.nextPageToken) break; pageToken = res.nextPageToken;
+      }
+      return Response.json({ ok: true, da, trovati: out });
+    }
+    if (url.searchParams.get("mode") === "ripristina_tutti") {   // una tantum: rimette la descrizione originale (= la parte «Note:» che il portale aveva conservato) su tutti gli eventi riscritti
+      const da = url.searchParams.get("da") || new Date(Date.now() - 6 * 3600000).toISOString();
+      const fatti: any[] = [], errori: any[] = []; let pageToken = "";
+      for (let giro = 0; giro < 10; giro++) {
+        const q = new URLSearchParams({ updatedMin: da, showDeleted: "true", singleEvents: "true", maxResults: "250" }); if (pageToken) q.set("pageToken", pageToken);
+        const res = await gapi("/events?" + q.toString());
+        for (const ev of res.items || []) {
+          if (ev.status === "cancelled" || !(ev.description || "").includes("— Portale Call Center")) continue;
+          const orig = noteDa(ev.description || "") || "";
+          try {
+            try { await gapi("/events/" + ev.id, "PATCH", { description: orig, colorId: null, extendedProperties: { private: { cc_id: null } } }); }
+            catch (_e) { await gapi("/events/" + ev.id, "PATCH", { description: orig }); }
+            fatti.push({ id: ev.id, summary: ev.summary, start: ev.start?.dateTime || ev.start?.date });
+          } catch (e: any) { errori.push({ id: ev.id, summary: ev.summary, errore: e.message }); }
+        }
+        if (!res.nextPageToken) break; pageToken = res.nextPageToken;
+      }
+      return Response.json({ ok: true, ripristinati: fatti.length, fatti, errori });
+    }
+    if (url.searchParams.get("mode") === "elimina") {     // una tantum: cancella un evento creato dal portale (solo se il creatore è il service account)
+      const gid = url.searchParams.get("gid") || "";
+      const ev = await gapi("/events/" + gid);
+      if ((ev.creator?.email || "") !== SA.client_email) return Response.json({ ok: false, errore: "non creato dal portale: non si tocca", creator: ev.creator?.email });
+      await gapi("/events/" + gid, "DELETE");
+      return Response.json({ ok: true, eliminato: { id: gid, summary: ev.summary, start: ev.start?.dateTime || ev.start?.date } });
+    }
     if (url.searchParams.get("mode") === "ripristina") {   // una tantum: rimette la descrizione originale (salvata nelle note) e toglie il colore messo dal portale
       const id = Number(url.searchParams.get("id"));
       const riga = (await sb.from("cc_registrazioni").select("*").eq("id", id).maybeSingle()).data;
