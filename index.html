@@ -265,7 +265,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.4 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.5 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -403,7 +403,8 @@ let regOggi=[];                // registrazioni di oggi dell'operatrice loggata
 let _timerTurno=null, _timerPoll=null, _rt=null, _rtOk=false;
 const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
-function opDi(id){return operatrici.find(o=>o.id===id)||{id,nome:'?'};}
+// Registrazioni senza telefonista (demo dirette dei consulenti / stand): contano sulla fonte, non su una persona
+function opDi(id){return (id!=null&&operatrici.find(o=>o.id===id))||{id,nome:'Senza telefonista',senza:true};}
 function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
 // Attività visibili alla telefonista loggata (l'admin può nasconderne alcune da Gestione → Telefoniste)
 function tipiMiei(){const n=currentUser?.tipi_nascosti||[];return tipiAttivi().filter(t=>!n.includes(t.codice));}
@@ -711,8 +712,8 @@ function etichettaSquadra(){return _squadra?' · squadra '+esc(_squadra):'';}
 // Con «Tutte»: un riquadro per squadra, cliccabile, per vederle una accanto all'altra
 function confrontoSquadre(regs){
   const sq=squadre();if(_squadra||sq.length<2||!haGruppi())return'';
-  const senza=regs.filter(r=>!opDi(r.operatrice_id).squadra);
-  return `<div class="section-title">Squadre a confronto</div><div class="metrics">${sq.map(q=>{const mie=regs.filter(r=>opDi(r.operatrice_id).squadra===q);return `<div class="metric fonte-tile" style="cursor:pointer;border-top:3px solid var(--indigo)" onclick="setSquadra('${esc(q)}')" title="Vedi solo ${esc(q)}"><div class="lbl" style="font-size:12px;color:var(--text)">${esc(q)}</div><div class="stats">${statHtml(contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),true)}</div></div>`;}).join('')}${senza.length?`<div class="metric fonte-tile" style="border-top:3px solid var(--text4)"><div class="lbl" style="font-size:12px">Senza squadra</div><div class="stats">${statHtml(contaGruppo(senza,'contatti'),contaGruppo(senza,'appuntamenti'),true)}</div></div>`:''}</div>`;
+  const senza=regs.filter(r=>r.operatrice_id!=null&&!opDi(r.operatrice_id).squadra),dirette=regs.filter(r=>r.operatrice_id==null);
+  return `<div class="section-title">Squadre a confronto</div><div class="metrics">${sq.map(q=>{const mie=regs.filter(r=>opDi(r.operatrice_id).squadra===q);return `<div class="metric fonte-tile" style="cursor:pointer;border-top:3px solid var(--indigo)" onclick="setSquadra('${esc(q)}')" title="Vedi solo ${esc(q)}"><div class="lbl" style="font-size:12px;color:var(--text)">${esc(q)}</div><div class="stats">${statHtml(contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),true)}</div></div>`;}).join('')}${senza.length?`<div class="metric fonte-tile" style="border-top:3px solid var(--text4)"><div class="lbl" style="font-size:12px">Senza squadra</div><div class="stats">${statHtml(contaGruppo(senza,'contatti'),contaGruppo(senza,'appuntamenti'),true)}</div></div>`:''}${dirette.length?`<div class="metric fonte-tile" style="border-top:3px solid var(--text4)"><div class="lbl" style="font-size:12px">Dirette (senza telefonista)</div><div class="stats">${statHtml(contaGruppo(dirette,'contatti'),contaGruppo(dirette,'appuntamenti'),true)}</div></div>`:''}</div>`;
 }
 const _cache={};   // chiave start|end → {regs,turni}
 function generaMesi(){const now=new Date(),out=[];let y=now.getFullYear(),m=now.getMonth()+1;while(y>ANNO_INIZIO_DATI||(y===ANNO_INIZIO_DATI&&m>=MESE_INIZIO_DATI)){out.push(`${y}-${String(m).padStart(2,'0')}`);m--;if(m<1){m=12;y--;}}return out.length?out:[yyyymm(now)];}
@@ -825,6 +826,7 @@ async function renderOperatrici(){
     ${confrontoSquadre(d.regs)}
     <div class="section-title">Classifica telefoniste${G?' · per appuntamenti presi':''}</div>
     <div class="op-grid">${ops.map((o,i)=>{const g=giorniOp[o.id]?.size||0,h=oreOp[o.id]||0;return cardOperatrice(o,regsDi[o.id]||[],{rank:(regsDi[o.id]||[]).length?i+1:0,sub:[g?g+(g===1?' giorno lavorato':' giorni lavorati'):'',h?ore(h)+' ore in turno':''].filter(Boolean).join(' · ')||'Nessun dato in questo periodo'});}).join('')}</div>
+    ${(regsDi['null']||[]).length?`<div class="section-title">Senza telefonista · dirette dei consulenti o dello stand</div><div class="op-grid">${cardOperatrice({nome:'Senza telefonista',attiva:true},regsDi['null'],{sub:'Contano sulla fonte, non su una persona'})}</div>`:''}
     <div class="muted" style="padding:0 4px 8px">Resa = appuntamenti presi ogni 100 contatti.</div>`;
 }
 
@@ -854,7 +856,7 @@ async function renderAndamento(){
   }else{
     const perOp={};regs.forEach(r=>perOp[r.operatrice_id]=(perOp[r.operatrice_id]||0)+1);
     const lista=Object.entries(perOp).sort((a,b)=>b[1]-a[1]),maxO=Math.max(1,...lista.map(x=>x[1]));
-    blocco=`<div class="section-title">${esc(t.nome)} per telefonista</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
+    blocco=`<div class="section-title">${esc(t.nome)} per telefonista</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${id==='null'?'Senza telefonista':nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
   }
   el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()}</div>
     <div class="seg seg-full" style="flex-wrap:wrap">${opzioni.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
@@ -961,6 +963,8 @@ async function esportaExcel(){
   const G=haGruppi();
   righe.push('');righe.push(['Riepilogo per telefonista','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %','Demo fatte']:[]),'Ore in turno'].map(q).join(';'));
   operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti')),contaDemo(mie).fatte]:[]),ore(h)].map(q).join(';'));});
+  const senza=regs.filter(r=>r.operatrice_id==null);
+  if(senza.length)righe.push(['Senza telefonista (dirette)','',...ta.map(t=>senza.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(senza,'contatti'),contaGruppo(senza,'appuntamenti'),pct(contaGruppo(senza,'appuntamenti'),contaGruppo(senza,'contatti')),contaDemo(senza).fatte]:[]),''].map(q).join(';'));
   const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`call-center-${p.start}${p.end!==p.start?'_'+p.end:''}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
