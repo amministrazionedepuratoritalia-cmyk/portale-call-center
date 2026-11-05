@@ -48,16 +48,16 @@
     .cal-now { position:absolute; left:0; right:0; height:2px; background:#FF3B30; z-index:2; }
 
     /* ── lavagna ── */
-    .lav { flex:1; min-height:0; display:grid; grid-template-columns:72px repeat(6,1fr); grid-template-rows:auto repeat(4,1fr) auto; border:2px solid #222; border-radius:8px; overflow:hidden; background:#fff; }
+    .lav { flex:1; min-height:0; display:grid; grid-template-columns:72px repeat(6,minmax(0,1fr)); grid-template-rows:auto repeat(4,minmax(0,1fr)) auto; border:2px solid #222; border-radius:8px; overflow:hidden; background:#fff; }
     .lav > div { border-right:1.5px solid #222; border-bottom:1.5px solid #222; padding:4px 6px; min-width:0; }
     .lav > div:nth-child(7n) { border-right:none; }
     .lav .giorno { text-align:center; font-weight:800; font-size:17px; letter-spacing:.5px; color:#5B2A86; text-transform:uppercase; line-height:1.1; padding:6px 2px; }
     .lav .giorno small { display:block; font-size:15px; font-weight:700; color:#5B2A86; }
     .lav .giorno.today { background:#EBF3FF; }
     .lav .fascia { font-weight:800; font-size:15px; color:#5B2A86; display:flex; flex-direction:column; justify-content:center; line-height:1.15; }
-    .lav .cella { display:flex; flex-direction:column; justify-content:space-between; }
+    .lav .cella { display:flex; flex-direction:column; justify-content:space-between; min-height:0; overflow:hidden; }
     .lav .cella.today { background:#FAFCFF; }
-    .caselle { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
+    .caselle { display:grid; grid-template-columns:repeat(var(--cols,4),1fr); gap:4px; }
     .casella { aspect-ratio:1/1; border:2px solid #3B6FD8; border-radius:3px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:22px; line-height:1; position:relative; background:#fff; }
     .casella.piena { color:#fff; font-size:15px; }
     .pe .box.piena { color:#fff; font-size:11px; }
@@ -69,7 +69,7 @@
     .tot > div:last-child { border-right:none; }
     .tot .lbl { font-weight:900; font-size:16px; letter-spacing:1px; margin-bottom:4px; display:flex; align-items:baseline; gap:8px; }
     .tot .lbl small { font-weight:700; font-size:12px; color:var(--text3); letter-spacing:0; }
-    .tot .caselle { grid-template-columns:repeat(10,1fr); gap:3px; }
+    .tot .caselle { grid-template-columns:repeat(var(--tcols,10),1fr); gap:3px; }
     .tot .casella { font-size:12px; border-width:1.5px; }
     .tot .casella.piena { color:#fff; }
     .vuoto { color:var(--text3); font-size:14px; padding:20px; text-align:center; }
@@ -180,6 +180,9 @@ function vuote(n,cls){return n>0?Array(n).fill(`<div class="${cls||'casella'}"><
 function disegnaLavagna(){
   const el=document.getElementById('lav');
   const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
+  // caselle per riga: 4 come sulla lavagna vera; di più se una cella ne ha tante, così al massimo 3 righe e tutto sta nello schermo
+  const maxCella=Math.max(CASELLE_FASCIA,...giorni.flatMap(g=>FASCE.map((f,i)=>(perG[g]||[]).filter(e=>fasciaDi(e)===i&&!e.zona).length)));
+  el.style.setProperty('--cols',String(Math.max(4,Math.ceil(maxCella/3))));
   let h=`<div></div>${giorni.map(g=>{const d=isoToDate(g);return `<div class="giorno${g===oggiIso()?' today':''}">${GIORNI[d.getDay()]}<small>${d.getDate()}|${d.getMonth()+1}</small></div>`;}).join('')}`;
   FASCE.forEach((f,i)=>{
     h+=`<div class="fascia">${f.lbl.split('\n').map(x=>`<span>${x}</span>`).join('')}</div>`;
@@ -192,7 +195,7 @@ function disegnaLavagna(){
   const fonti=fontiMostrate();
   const sigla=f=>({'CC':'C.C.','Stand':'ST.','Internet':'INTERNET','Referenze':'R.F.'})[f]||f.toUpperCase();
   h+=`<div class="tot">${fonti.map(f=>{const t=tipi.find(y=>(y.fonte||y.nome)===f),lista=pren.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length,base=t.caselle_lavagna||20,n=Math.max(base,Math.ceil(lista.length/10)*10);
-    return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} presi su ${base}${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle">${lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(n-lista.length)}</div></div>`;}).join('')}</div>`;
+    return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} presi su ${base}${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle" style="--tcols:${n<=20?10:n<=40?20:Math.ceil(n/2)}">${lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(n-lista.length)}</div></div>`;}).join('')}</div>`;
   el.innerHTML=h;
 }
 // ── orologio, aggiornamento automatico, tempo reale ──
