@@ -265,7 +265,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.5 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.6 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -832,36 +832,52 @@ async function renderOperatrici(){
 
 // ── ANDAMENTO (periodo) ──
 let _metricaAnd=null;
+// Grafico a linea in SVG (niente librerie): punti, valori scritti, griglia leggera
+const COLORE_HEX={blue:'#0071E3',green:'#1D8348',amber:'#B25000',red:'#CC1B1B',pink:'#C0185A',purple:'#7B2FBE',indigo:'#5E5CE6',gray:'#636366'};
+function graficoLinea(etichette,valori,opt={}){
+  const n=valori.length;if(!n)return'<div class="empty">Niente da mostrare.</div>';
+  const col=COLORE_HEX[opt.colore]||COLORE_HEX.blue,fitto=n>12,passo=fitto?34:62,padL=34,padR=18,padT=26,padB=34;
+  const W=Math.max(360,padL+padR+passo*(n-1)),H=210,max=Math.max(1,...valori);
+  const x=i=>n===1?W/2:padL+i*(W-padL-padR)/(n-1),y=v=>padT+(H-padT-padB)*(1-v/max);
+  const pts=valori.map((v,i)=>[x(i),y(v)]);
+  const linea=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+  const area=linea+` L${pts[n-1][0].toFixed(1)} ${y(0).toFixed(1)} L${pts[0][0].toFixed(1)} ${y(0).toFixed(1)} Z`;
+  const griglia=[0.5,1].map(f=>`<line x1="${padL}" x2="${W-padR}" y1="${y(max*f).toFixed(1)}" y2="${y(max*f).toFixed(1)}" stroke="rgba(0,0,0,0.08)" stroke-dasharray="3 3"/><text x="${padL-6}" y="${(y(max*f)+4).toFixed(1)}" font-size="10" fill="#8E8E93" text-anchor="end">${Math.round(max*f)}</text>`).join('');
+  const base=`<line x1="${padL}" x2="${W-padR}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="rgba(0,0,0,0.15)"/>`;
+  const punti=pts.map((q,i)=>{const ev=opt.evidenzia===i,off=opt.spenti&&opt.spenti[i];return `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${ev?5.5:4}" fill="${off?'#fff':col}" stroke="${col}" stroke-width="2"/>${valori[i]?`<text x="${q[0].toFixed(1)}" y="${(q[1]-10).toFixed(1)}" font-size="${fitto?10:12}" font-weight="700" fill="#000" text-anchor="middle">${valori[i]}</text>`:''}`;}).join('');
+  const labels=etichette.map((l,i)=>{const ev=opt.evidenzia===i,off=opt.spenti&&opt.spenti[i];return `<text x="${x(i).toFixed(1)}" y="${H-10}" font-size="${fitto?10:11}" font-weight="${ev?'700':'500'}" fill="${ev?'#0071E3':off?'#C7C7CC':'#636366'}" text-anchor="middle">${esc(l)}</text>`;}).join('');
+  return `<div class="table-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMinYMid meet" style="display:block;height:auto;max-height:${H}px;min-width:${fitto?W:0}px;font-family:inherit"><path d="${area}" fill="${col}" fill-opacity="0.08"/>${griglia}${base}<path d="${linea}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${punti}${labels}</svg></div>`;
+}
 async function renderAndamento(){
   const el=document.getElementById('tab-andamento'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const ta=tipiAttivi(),G=haGruppi();
-  const opzioni=(G?[{codice:'g:contatti',nome:'Tutti i contatti',colore:'blue'},{codice:'g:appuntamenti',nome:'Tutti gli appuntamenti',colore:'green'}]:[]).concat(ta);
+  const opzioni=(G?[{codice:'g:contatti',nome:'Tutti i contatti',colore:'blue'},{codice:'g:appuntamenti',nome:'Tutti gli appuntamenti',colore:'green'},{codice:'g:demo',nome:'Demo fatte',colore:'purple'}]:[]).concat(ta);
   if(!_metricaAnd||!opzioni.some(t=>t.codice===_metricaAnd))_metricaAnd=opzioni[0]?.codice;
   const t=opzioni.find(x=>x.codice===_metricaAnd)||tipoDi(_metricaAnd);
-  const codici=_metricaAnd.startsWith('g:')?codiciGruppo(_metricaAnd.slice(2)):new Set([_metricaAnd]);
-  const regs=d.regs.filter(r=>codici.has(r.tipo_codice));
+  const regs=_metricaAnd==='g:demo'?d.regs.filter(r=>isApp(r)&&r.demo==='fatta'):(()=>{const codici=_metricaAnd.startsWith('g:')?codiciGruppo(_metricaAnd.slice(2)):new Set([_metricaAnd]);return d.regs.filter(r=>codici.has(r.tipo_codice));})();
   // per ora del giorno (sempre)
   const perOra=Array(24).fill(0);regs.forEach(r=>perOra[new Date(r.ora).getHours()]++);
   const h0=Math.min(8,perOra.findIndex(v=>v>0)<0?8:perOra.findIndex(v=>v>0)),h1=Math.max(19,23-[...perOra].reverse().findIndex(v=>v>0));
-  const maxOra=Math.max(1,...perOra);
   // per giorno (settimana / mese) oppure per telefonista (giorno)
   let blocco='';
   if(p.mode!=='giorno'){
     const giorni=[];for(let g=p.start;g<=p.end;g=isoAddDays(g,1))giorni.push(g);
     const perG={};regs.forEach(r=>perG[r.data]=(perG[r.data]||0)+1);
-    const maxG=Math.max(1,...Object.values(perG));
-    blocco=`<div class="section-title">${esc(t.nome)} per giorno</div><div class="card"><div class="chart">${giorni.map(g=>{const wd=isoToDate(g).getDay();return`<div class="col${g===oggiIso()?' today':''}${wd===0?' off':''}"><div class="v">${perG[g]||''}</div><div class="b fill-${t.colore}" style="height:${pct(perG[g]||0,maxG)}%"></div><div class="l">${p.mode==='sett'?labelGiorno(g,false):isoToDate(g).getDate()}</div></div>`;}).join('')}</div></div>`;
+    const tot=regs.length,gg=giorni.filter(g=>perG[g]).length;
+    blocco=`<div class="section-title">${esc(t.nome)} per giorno · totale ${tot}${gg?` · media ${(tot/gg).toFixed(1).replace('.',',')} al giorno lavorato`:''}</div><div class="card">${graficoLinea(giorni.map(g=>p.mode==='sett'?labelGiorno(g,false):String(isoToDate(g).getDate())),giorni.map(g=>perG[g]||0),{colore:t.colore,evidenzia:giorni.indexOf(oggiIso()),spenti:giorni.map(g=>isoToDate(g).getDay()===0)})}</div>`;
   }else{
     const perOp={};regs.forEach(r=>perOp[r.operatrice_id]=(perOp[r.operatrice_id]||0)+1);
     const lista=Object.entries(perOp).sort((a,b)=>b[1]-a[1]),maxO=Math.max(1,...lista.map(x=>x[1]));
     blocco=`<div class="section-title">${esc(t.nome)} per telefonista</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${id==='null'?'Senza telefonista':nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
   }
+  const ore=[];for(let h=h0;h<=h1;h++)ore.push(h);
   el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()}</div>
     <div class="seg seg-full" style="flex-wrap:wrap">${opzioni.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
     ${blocco}
-    <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card"><div class="chart">${perOra.slice(h0,h1+1).map((v,i)=>`<div class="col"><div class="v">${v||''}</div><div class="b fill-${t.colore}" style="height:${pct(v,maxOra)}%"></div><div class="l">${h0+i}</div></div>`).join('')}</div></div>`;
+    <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card">${graficoLinea(ore.map(h=>h+':00'),ore.map(h=>perOra[h]),{colore:t.colore})}</div>
+    ${_metricaAnd==='g:demo'?'<div class="muted" style="padding:0 4px 8px">Le demo sono contate sul giorno in cui è stato preso l\'appuntamento.</div>':''}`;
 }
 
 // ── REGISTRAZIONI (periodo, con filtri e Excel) ──
