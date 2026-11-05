@@ -8,12 +8,17 @@
 // GCAL_HOOK_SECRET (deve coincidere con l'header x-hook-secret), GCAL_FONTE_DEFAULT (es. app_cc).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const SA = JSON.parse(Deno.env.get("GCAL_SERVICE_ACCOUNT") || "{}");
-const CAL_ID = Deno.env.get("GCAL_CALENDAR_ID") || "";
-const HOOK_SECRET = Deno.env.get("GCAL_HOOK_SECRET") || "";
-const FONTE_DEFAULT = Deno.env.get("GCAL_FONTE_DEFAULT") || "app_cc";
 const TZ = "Europe/Rome";
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+// Configurazione: dalle variabili d'ambiente oppure dalla tabella cc_sync_state (protetta da RLS, la legge solo la chiave di servizio)
+let SA: any = {}, CAL_ID = "", HOOK_SECRET = "", FONTE_DEFAULT = "app_cc", _cfgAt = 0;
+async function config() {
+  if (Date.now() - _cfgAt < 60000 && HOOK_SECRET) return;
+  const righe = (await sb.from("cc_sync_state").select("k,v")).data || [];
+  const cfg = (k: string) => Deno.env.get(k) || righe.find((r: any) => r.k === k)?.v || "";
+  SA = JSON.parse(cfg("GCAL_SERVICE_ACCOUNT") || "{}"); CAL_ID = cfg("GCAL_CALENDAR_ID"); HOOK_SECRET = cfg("GCAL_HOOK_SECRET"); FONTE_DEFAULT = cfg("GCAL_FONTE_DEFAULT") || "app_cc";
+  _cfgAt = Date.now();
+}
 
 // ── token Google con l'account di servizio (JWT RS256) ──
 let _tok: { v: string; exp: number } | null = null;
@@ -192,7 +197,9 @@ async function pull() {
 }
 
 Deno.serve(async (req) => {
+  try { await config(); } catch (e: any) { return Response.json({ ok: false, errore: "config: " + e.message }, { status: 500 }); }
   if (!HOOK_SECRET || req.headers.get("x-hook-secret") !== HOOK_SECRET) return new Response("no", { status: 401 });
+  if (!CAL_ID || !SA.client_email) return Response.json({ ok: false, errore: "manca la configurazione Google (GCAL_SERVICE_ACCOUNT / GCAL_CALENDAR_ID)" }, { status: 503 });
   try {
     await base();
     const url = new URL(req.url);
