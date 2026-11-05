@@ -73,8 +73,8 @@
     .lav .cella.today { background:#FAFCFF; }
     .caselle { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
     .casella { aspect-ratio:1/1; border:2px solid #3B6FD8; border-radius:3px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:22px; line-height:1; position:relative; background:#fff; }
-    .casella.piena.fatta::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,0.06) 3px 6px); }
-    .casella .x { font-family:'Comic Sans MS','Marker Felt','Chalkboard SE',cursive; transform:rotate(-6deg); }
+    .casella.piena { color:#fff; font-size:15px; }
+    .pe .box.piena { color:#fff; font-size:11px; }
     .pe { display:flex; gap:10px; align-items:center; margin-top:4px; font-weight:800; font-size:13px; }
     .pe .p { color:#19A974; } .pe .e { color:#E8732A; }
     .pe .box { display:inline-block; width:18px; height:18px; border:2px solid currentColor; border-radius:3px; vertical-align:middle; margin-left:3px; text-align:center; font-size:13px; line-height:14px; color:#000; }
@@ -131,7 +131,8 @@ function hm(t){return t?String(t).slice(0,5):'';}
 function minuti(t){if(!t)return null;const[h,m]=String(t).split(':').map(Number);return h*60+m;}
 async function api(path){const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
 
-let tipi=[],operatrici=[],evs=[];
+let tipi=[],operatrici=[],evs=[],pren=[];   // evs = appuntamenti fissati nella settimana (per data), pren = appuntamenti presi nella settimana (per giorno in cui sono stati presi)
+const ZONE={P:'Piemonte',E:'Emilia-Romagna'};
 const tipoDi=c=>tipi.find(t=>t.codice===c)||{nome:c,colore:'gray'};
 const opDi=id=>(id!=null&&operatrici.find(o=>o.id===id))||{nome:'Senza telefonista',senza:true};
 const start=q.get('settimana')||lunediDi(oggiIso());   // lunedì della settimana mostrata (la TV mostra quella corrente)
@@ -140,20 +141,23 @@ function titoloSett(){const a=isoToDate(giorni[0]),b=isoToDate(giorni[5]);return
 
 async function carica(){
   try{
-    const [t,o]=await Promise.all([api('cc_tipi?select=codice,nome,fonte,gruppo,colore,icona,attivo&order=ordine'),api('cc_operatrici?select=id,nome')]);
+    const [t,o]=await Promise.all([api('cc_tipi?select=codice,nome,fonte,gruppo,colore,icona,attivo,caselle_lavagna&order=ordine'),api('cc_operatrici?select=id,nome')]);
     tipi=t;operatrici=o;
     const cod=tipi.filter(x=>x.gruppo==='appuntamenti').map(x=>x.codice);
-    evs=cod.length?await api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${giorni[0]}&data_appuntamento=lte.${giorni[5]}&select=id,operatrice_id,tipo_codice,cliente,indirizzo,venditore,data_appuntamento,ora_appuntamento,durata_min,demo&order=data_appuntamento,ora_appuntamento`):[];
+    [evs,pren]=cod.length?await Promise.all([
+      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${giorni[0]}&data_appuntamento=lte.${giorni[5]}&select=id,operatrice_id,tipo_codice,cliente,indirizzo,venditore,data_appuntamento,ora_appuntamento,durata_min,demo,zona&order=data_appuntamento,ora_appuntamento`),
+      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data=gte.${giorni[0]}&data=lte.${isoAddDays(giorni[0],6)}&solo_calendario=is.false&select=id,tipo_codice,cliente,data,data_appuntamento,ora_appuntamento,demo,zona&order=data,ora`)]):[[],[]];
     disegna();
     document.getElementById('agg').textContent='aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
   }catch(e){document.getElementById('agg').textContent='errore: '+e.message;}
 }
 // fonti mostrate: quelle attive, più «Non indicata» solo se in settimana c'è qualche appuntamento senza fonte (arrivato da Google)
-function fontiMostrate(){return [...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&(t.attivo||evs.some(e=>e.tipo_codice===t.codice))).map(t=>t.fonte||t.nome))];}
-function legenda(){const f=fontiMostrate();return f.map(x=>{const t=tipi.find(y=>(y.fonte||y.nome)===x);return `<span><i style="background:${COLORE_HEX[t.colore]||'#000'}"></i>${esc(x)}</span>`;}).join('')+'<span><i style="background:repeating-linear-gradient(45deg,#fff 0 3px,#bbb 3px 6px);border:1px solid #999"></i>demo fatta</span>';}
+function fontiMostrate(){return [...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&(t.attivo||evs.some(e=>e.tipo_codice===t.codice)||pren.some(e=>e.tipo_codice===t.codice))).map(t=>t.fonte||t.nome))];}
+function legenda(){const f=fontiMostrate();return f.map(x=>{const t=tipi.find(y=>(y.fonte||y.nome)===x);return `<span><i style="background:${COLORE_HEX[t.colore]||'#000'}"></i>${esc(x)}</span>`;}).join('')+'<span>✓ demo fatta</span>';}
+function legendaLav(){return legenda()+`<span><i style="background:${NERO}"></i>preso per il giorno dopo</span><span><i style="background:${ROSSO}"></i>settimana successiva</span><span>P. Piemonte · E. Emilia-Romagna</span>`;}
 function disegna(){
   document.getElementById('sett').textContent='Settimana '+titoloSett();
-  const l=legenda();['leg1','leg2'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=l;});
+  const l1=document.getElementById('leg1');if(l1)l1.innerHTML=legenda();const l2=document.getElementById('leg2');if(l2)l2.innerHTML=legendaLav();
   if(document.getElementById('cal'))disegnaCalendario();
   if(document.getElementById('lav'))disegnaLavagna();
 }
@@ -189,8 +193,16 @@ function disegnaAgenda(perG,maxGiorno){
         return `<div class="ag-ev${e.demo==='fatta'?' fatta':''}${passato?' passato':''}" style="border-left-color:${COLORE_HEX[t.colore]||'#636366'}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.venditore?' · '+e.venditore:''))}"><span class="h">${e.ora_appuntamento?hm(e.ora_appuntamento):'—'}</span><span class="c">${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</span>${largo&&e.venditore?`<span class="v">${esc(e.venditore)}</span>`:''}</div>`;}).join('')}</div></div>`;}).join('');
 }
 // ── lavagna ──
-function fasciaDi(e){const m=minuti(e.ora_appuntamento);if(m==null)return -1;return FASCE.findIndex(f=>m>=f.da&&m<f.a);}
-function xHtml(e){const t=tipoDi(e.tipo_codice),o=opDi(e.operatrice_id);return `<div class="casella piena${e.demo==='fatta'?' fatta':''}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+' · '+o.nome+(e.ora_appuntamento?' · '+hm(e.ora_appuntamento):''))}"><span class="x" style="color:${COLORE_HEX[t.colore]}">✗</span></div>`;}
+// Nei giorni: gli appuntamenti FISSATI quel giorno, nella fascia della loro ora (senza ora: prima fascia), casella piena col colore della fonte;
+// P. ed E. = Piemonte ed Emilia-Romagna, il resto è Lombardia. In fondo: gli appuntamenti PRESI nella settimana (lun–dom) per fonte,
+// 20 caselle (Stand 40, l'admin può cambiarle): nero = preso per il giorno dopo, rosso = va a una settimana successiva, altrimenti colore della fonte.
+const NERO='#111111',ROSSO='#CC1B1B';
+function fasciaDi(e){const m=minuti(e.ora_appuntamento);if(m==null)return 0;const i=FASCE.findIndex(f=>m>=f.da&&m<f.a);return i<0?0:i;}
+function coloreFonte(e){return COLORE_HEX[tipoDi(e.tipo_codice).colore]||'#636366';}
+function colorePreso(e){if(!e.data_appuntamento||!e.data)return coloreFonte(e);if(e.data_appuntamento===isoAddDays(e.data,1))return NERO;if(lunediDi(e.data_appuntamento)>lunediDi(e.data))return ROSSO;return coloreFonte(e);}
+const ggmm=iso=>iso?iso.split('-').reverse().slice(0,2).join('/'):'';
+function box(e,colore,cls){const t=tipoDi(e.tipo_codice);return `<div class="${cls||'casella'} piena${e.demo==='fatta'?' fatta':''}" style="background:${colore};border-color:${colore}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.zona?' · '+ZONE[e.zona]:'')+(e.data_appuntamento?' · '+ggmm(e.data_appuntamento):'')+(e.ora_appuntamento?' '+hm(e.ora_appuntamento):''))}">${e.demo==='fatta'?'✓':''}</div>`;}
+function vuote(n,cls){return n>0?Array(n).fill(`<div class="${cls||'casella'}"></div>`).join(''):'';}
 function disegnaLavagna(){
   const el=document.getElementById('lav');
   const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
@@ -198,15 +210,15 @@ function disegnaLavagna(){
   FASCE.forEach((f,i)=>{
     h+=`<div class="fascia">${f.lbl.split('\n').map(x=>`<span>${x}</span>`).join('')}</div>`;
     giorni.forEach(g=>{
-      const lista=(perG[g]||[]).filter(e=>fasciaDi(e)===i||(i===0&&fasciaDi(e)===-1));
-      const n=Math.max(CASELLE_FASCIA,lista.length);
-      h+=`<div class="cella${g===oggiIso()?' today':''}"><div class="caselle">${lista.map(xHtml).join('')}${Array(n-lista.length).fill('<div class="casella"></div>').join('')}</div><div class="pe"><span class="p">P.<span class="box"></span></span><span class="e">E.<span class="box"></span><span class="box"></span></span></div></div>`;
+      const lista=(perG[g]||[]).filter(e=>fasciaDi(e)===i),L=lista.filter(e=>!e.zona),P=lista.filter(e=>e.zona==='P'),E=lista.filter(e=>e.zona==='E');
+      h+=`<div class="cella${g===oggiIso()?' today':''}"><div class="caselle">${L.map(e=>box(e,coloreFonte(e))).join('')}${vuote(Math.max(CASELLE_FASCIA,L.length)-L.length)}</div>
+        <div class="pe"><span class="p">P.${P.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(1,P.length)-P.length,'box')}</span><span class="e">E.${E.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(2,E.length)-E.length,'box')}</span></div></div>`;
     });
   });
-  // totali della settimana per fonte, come la riga in basso della lavagna
   const fonti=fontiMostrate();
   const sigla=f=>({'CC':'C.C.','Stand':'ST.','Internet':'INTERNET','Referenze':'R.F.'})[f]||f.toUpperCase();
-  h+=`<div class="tot">${fonti.map(f=>{const lista=evs.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),t=tipi.find(y=>(y.fonte||y.nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length;const n=Math.max(CASELLE_TOT,Math.ceil(lista.length/10)*10);return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} appuntamenti${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle">${lista.map(e=>`<div class="casella piena" style="background:${COLORE_HEX[t.colore]};border-color:${COLORE_HEX[t.colore]}" title="${esc((e.cliente||'')+' · '+opDi(e.operatrice_id).nome)}">${e.demo==='fatta'?'✓':''}</div>`).join('')}${Array(n-lista.length).fill('<div class="casella"></div>').join('')}</div></div>`;}).join('')}</div>`;
+  h+=`<div class="tot">${fonti.map(f=>{const t=tipi.find(y=>(y.fonte||y.nome)===f),lista=pren.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length,base=t.caselle_lavagna||20,n=Math.max(base,Math.ceil(lista.length/10)*10);
+    return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} presi su ${base}${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle">${lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(n-lista.length)}</div></div>`;}).join('')}</div>`;
   el.innerHTML=h;
 }
 // ── orologio, aggiornamento automatico, tempo reale ──

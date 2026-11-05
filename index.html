@@ -290,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.1 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.2 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -435,6 +435,7 @@ let _timerTurno=null, _timerPoll=null, _rt=null, _rtOk=false;
 const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
 // Registrazioni senza telefonista (demo dirette dei consulenti / stand): contano sulla fonte, non su una persona
+const ZONE={P:'Piemonte',E:'Emilia-Romagna'};function zonaLabel(z){return ZONE[z]||'Lombardia';}
 function opDi(id){return (id!=null&&operatrici.find(o=>o.id===id))||{id,nome:'Senza telefonista',senza:true};}
 function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
 // Attività visibili alla telefonista loggata (l'admin può nasconderne alcune da Gestione → Telefoniste)
@@ -686,13 +687,14 @@ function apriDettaglio(t){
     <label>Telefono</label><input id="d-telefono" inputmode="tel" placeholder="Numero">
     <div class="two-col"><div><label>${isApp?'Data appuntamento':'Data (richiamo / appuntamento)'}</label><input type="date" id="d-dataapp"></div><div><label>Ora</label><input type="time" id="d-oraapp" step="900"></div></div>
     <label>Indirizzo</label><input id="d-indirizzo" placeholder="Via, città">
+    <label>Zona</label><select id="d-zona"><option value="">Lombardia</option><option value="P">Piemonte</option><option value="E">Emilia-Romagna</option></select>
     <label>Note</label><textarea id="d-note" rows="2" placeholder="Cosa ha detto, preferenze…"></textarea>
     <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaDettaglio('${t.codice}')"><i class="ti ti-check"></i> Registra</button></div>`);
   setTimeout(()=>document.getElementById('d-cliente')?.focus(),250);
 }
 async function salvaDettaglio(codice){
   const v=id=>document.getElementById(id).value.trim();
-  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,ora_appuntamento:v('d-oraapp')||null,indirizzo:v('d-indirizzo')||null,note:v('d-note')||null});
+  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,ora_appuntamento:v('d-oraapp')||null,indirizzo:v('d-indirizzo')||null,zona:v('d-zona')||null,note:v('d-note')||null});
   if(ok)chiudiModal();
 }
 async function loadAppOp(){
@@ -706,7 +708,7 @@ async function loadAppOp(){
     <div class="muted" style="padding:0 4px 8px">La demo la segna l'ufficio: qui la vedi e basta.</div>
     ${regs.length?`<div class="card card-flush">${regs.map(r=>{const t=tipoDi(r.tipo_codice);return`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
       <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b> · ${esc(t.fonte||t.nome)}</div>
-      <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.venditore?'demo di '+r.venditore:'',r.note].filter(Boolean).map(esc).join(' · ')}</div></div>${demoBadge(r)}</div>`;}).join('')}</div>`:'<div class="empty">Nessun appuntamento in questo mese.</div>'}`;
+      <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.zona?zonaLabel(r.zona):'',r.venditore?'demo di '+r.venditore:'',r.note].filter(Boolean).map(esc).join(' · ')}</div></div>${demoBadge(r)}</div>`;}).join('')}</div>`:'<div class="empty">Nessun appuntamento in questo mese.</div>'}`;
 }
 async function loadStoricoOp(){
   const mese=document.getElementById('op-storico-mese').value,el=document.getElementById('op-storico');
@@ -964,7 +966,7 @@ function rigaApp(r){
   const t=tipoDi(r.tipo_codice),o=opDi(r.operatrice_id);
   return `<div class="row" id="app-${r.id}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
     <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b>${o.senza?'':' · '+esc(o.nome)} · ${esc(t.fonte||t.nome)}${r.solo_calendario?' <span class="pill bg-gray c-gray">solo calendario</span>':''}</div>
-    <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.venditore?'demo di '+r.venditore:'',r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
+    <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.zona?zonaLabel(r.zona):'',r.venditore?'demo di '+r.venditore:'',r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
     <div class="demo-seg"><button class="btn btn-xs" title="Apri nel calendario" onclick="apriEvento(${r.id})"><i class="ti ti-calendar"></i></button><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}</div></div>`;
 }
 async function setDemo(id,v){
@@ -1222,7 +1224,7 @@ function layoutEv(lista){
   evs.forEach(x=>{if(x.s>=fine)chiudi();fine=Math.max(fine,x.f);cluster.push(x);});chiudi();
   return out;
 }
-function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||60)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([o.senza?'':o.nome.split(' ')[0],e.venditore?'→ '+e.venditore:'',e.indirizzo].filter(Boolean).join(' · '))}</div>`;}
+function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||60)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([o.senza?'':o.nome.split(' ')[0],e.zona?ZONE[e.zona]:'',e.venditore?'→ '+e.venditore:'',e.indirizzo].filter(Boolean).join(' · '))}</div>`;}
 function calClickGiorno(ev,g){if(_calVista==='mese'&&(!_calEdit||window.matchMedia('(max-width:700px)').matches)){_calData=g;calVista('giorno');return;}if(!_calEdit)return;apriEvento(null,g);}
 function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarget.getBoundingClientRect().top;const h=CAL_H0+Math.floor(y/CAL_HH),m=Math.floor((y%CAL_HH)/(CAL_HH/2))*30;apriEvento(null,g,`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 // Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
@@ -1234,7 +1236,7 @@ function apriEvento(id,data,ora){
   if(e&&!appTipi.some(t=>t.codice===e.tipo_codice)&&tipoDi(e.tipo_codice).gruppo==='appuntamenti')appTipi.push(tipoDi(e.tipo_codice));   // es. «Non indicata» (arrivato da Google)
   const ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||(e&&o.id===e.operatrice_id)));
   const venditori=[...new Set(_calEvs.map(x=>x.venditore).filter(Boolean))].sort();
-  const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:60,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',note:''};
+  const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:60,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',zona:'',note:''};
   if(e&&data&&!e.data_appuntamento)v.data_appuntamento=data;
   const dis=ro?'disabled':'';
   apriModal(`<h2>${id?(ro?'Appuntamento':'Modifica appuntamento'):'Nuovo appuntamento'}</h2>${e?`<div class="muted">${e.solo_calendario?'Importato da Google Calendar · creato':'Preso'} ${labelGiorno(e.data)} ${hhmm(e.ora)}${e.solo_calendario&&!e.operatrice_id?'':' da '+esc(opDi(e.operatrice_id).nome)}</div>`:''}
@@ -1243,7 +1245,8 @@ function apriEvento(id,data,ora){
     <div class="two-col"><div><label>Telefono</label><input id="ev-telefono" inputmode="tel" value="${esc(v.telefono||'')}" ${dis}></div><div><label>Fonte</label><select id="ev-tipo" ${dis}>${appTipi.map(t=>`<option value="${t.codice}" ${t.codice===v.tipo_codice?'selected':''}>${esc(t.fonte||t.nome)}</option>`).join('')}</select></div></div>
     <label>Indirizzo</label><input id="ev-indirizzo" value="${esc(v.indirizzo||'')}" placeholder="Via, città" ${dis}>
     <div class="two-col"><div><label>Data</label><input type="date" id="ev-data" value="${v.data_appuntamento||''}" ${dis}></div><div><label>Ora</label><input type="time" id="ev-ora" value="${hm(v.ora_appuntamento)}" step="900" ${dis}></div></div>
-    <div class="two-col"><div><label>Durata (minuti)</label><input type="number" id="ev-durata" value="${v.durata_min||60}" min="15" step="15" ${dis}></div><div><label>Venditore (chi fa la demo)</label><input id="ev-venditore" value="${esc(v.venditore||'')}" list="venditori-list" ${dis}><datalist id="venditori-list">${venditori.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div></div>
+    <div class="two-col"><div><label>Durata (minuti)</label><input type="number" id="ev-durata" value="${v.durata_min||60}" min="15" step="15" ${dis}></div><div><label>Zona</label><select id="ev-zona" ${dis}><option value="">Lombardia</option><option value="P" ${v.zona==='P'?'selected':''}>Piemonte</option><option value="E" ${v.zona==='E'?'selected':''}>Emilia-Romagna</option></select></div></div>
+    <label>Venditore (chi fa la demo)</label><input id="ev-venditore" value="${esc(v.venditore||'')}" list="venditori-list" ${dis}><datalist id="venditori-list">${venditori.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
     <label>Telefonista</label><select id="ev-op" ${dis}><option value="">— senza telefonista —</option>${ops.map(o=>`<option value="${o.id}" ${o.id===v.operatrice_id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
     <label>Note</label><textarea id="ev-note" rows="2" ${dis}>${esc(v.note||'')}</textarea>
     ${e?`<div class="flex wrap" style="margin-top:14px;gap:6px">${demoBadge(e)}${ro?'':`<button class="btn btn-xs btn-success" onclick="setDemoCal(${e.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs btn-danger" onclick="setDemoCal(${e.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${e.demo?`<button class="btn btn-xs" onclick="setDemoCal(${e.id},null)">Da fare</button>`:''}`}</div>`:''}
@@ -1252,7 +1255,7 @@ function apriEvento(id,data,ora){
 }
 async function salvaEvento(id){
   const v=i=>document.getElementById(i).value.trim();
-  const body={cliente:v('ev-cliente')||null,telefono:v('ev-telefono')||null,indirizzo:v('ev-indirizzo')||null,data_appuntamento:v('ev-data')||null,ora_appuntamento:v('ev-ora')||null,durata_min:+v('ev-durata')||60,tipo_codice:v('ev-tipo'),venditore:v('ev-venditore')||null,note:v('ev-note')||null,operatrice_id:v('ev-op')?+v('ev-op'):null};
+  const body={cliente:v('ev-cliente')||null,telefono:v('ev-telefono')||null,indirizzo:v('ev-indirizzo')||null,data_appuntamento:v('ev-data')||null,ora_appuntamento:v('ev-ora')||null,durata_min:+v('ev-durata')||60,tipo_codice:v('ev-tipo'),venditore:v('ev-venditore')||null,zona:v('ev-zona')||null,note:v('ev-note')||null,operatrice_id:v('ev-op')?+v('ev-op'):null};
   try{
     if(id)await api(`cc_registrazioni?id=eq.${id}`,'PATCH',body);
     else await api('cc_registrazioni','POST',{...body,data:oggiIso(),ora:new Date().toISOString()});
@@ -1265,12 +1268,14 @@ async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PA
 
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
 let _lavSett=null;
+async function caselleLavagna(codice,delta){const t=tipoDi(codice),n=Math.max(10,(t.caselle_lavagna||20)+delta);try{await api(`cc_tipi?codice=eq.${codice}`,'PATCH',{caselle_lavagna:n});t.caselle_lavagna=n;renderLavagna();toast(`${t.fonte}: ${n} caselle in fondo`);}catch(e){toast('Errore: '+e.message);}}
 function renderLavagna(){
   const el=document.getElementById('tab-lavagna');if(!_lavSett)_lavSett=lunediDi(oggiIso());
   const tvUrl=new URL('tv.html',location.href).href;
   el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSett=lunediDi(oggiIso());renderLavagna()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,-7);renderLavagna()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,7);renderLavagna()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSett)}</div>
       <a class="btn btn-sm" href="${tvUrl}" target="_blank"><i class="ti ti-device-tv"></i> Apri la pagina per la TV</a></div>
-    <div class="muted" style="padding:0 4px 8px">Si aggiorna da sola con gli appuntamenti del calendario. Per la TV in ufficio apri «Apri la pagina per la TV» a schermo intero: a sinistra il calendario, a destra la lavagna.</div>
+    <div class="muted" style="padding:0 4px 6px">Si aggiorna da sola. Nei giorni: gli appuntamenti fissati, col colore della fonte (P. = Piemonte, E. = Emilia-Romagna). In fondo: gli appuntamenti presi nella settimana per fonte — <b>nero</b> se preso per il giorno dopo, <b>rosso</b> se va a una settimana successiva.</div>
+    <div class="flex wrap" style="gap:8px;padding:0 4px 10px;align-items:center"><span class="muted">Caselle in fondo:</span>${tipiAttivi().filter(t=>t.gruppo==='appuntamenti'&&t.fonte).map(t=>`<span class="pill bg-${t.colore} c-${t.colore}" style="gap:6px">${esc(t.fonte)} <b>${t.caselle_lavagna||20}</b> <button class="btn btn-xs" title="Togli 10 caselle" onclick="caselleLavagna('${t.codice}',-10)">−10</button><button class="btn btn-xs" title="Aggiungi 10 caselle" onclick="caselleLavagna('${t.codice}',10)">+10</button></span>`).join('')}</div>
     <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSett}" style="width:100%;height:calc(100vh - 230px);min-height:560px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
 }
 

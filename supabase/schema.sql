@@ -32,6 +32,7 @@ create table if not exists cc_tipi (
   fonte            text,                                  -- es. 'CC', 'Stand': le attività con la stessa fonte stanno nella stessa scheda
   chiede_dettaglio boolean     not null default false,    -- true = apre la scheda cliente/data/note
   obiettivo_giorno int         not null default 0,        -- 0 = nessun obiettivo
+  caselle_lavagna  int         not null default 20,       -- caselle in fondo alla lavagna TV per questa fonte (Stand 40)
   created_at       timestamptz not null default now()
 );
 
@@ -53,6 +54,7 @@ create table if not exists cc_registrazioni (
   demo              text check (demo in ('fatta','non_fatta')),  -- segnata dall'admin sugli appuntamenti
   demo_data         date,
   solo_calendario   boolean     not null default false,         -- true = evento già su Google prima del collegamento: calendario sì, statistiche no
+  zona              text        check (zona in ('P','E')),       -- P = Piemonte, E = Emilia-Romagna, null = Lombardia (caselle P./E. della lavagna)
   created_at        timestamptz not null default now()
 );
 create index if not exists cc_registrazioni_data_idx on cc_registrazioni(data);

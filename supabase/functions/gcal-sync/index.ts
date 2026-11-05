@@ -91,13 +91,16 @@ function daTitolo(summary: string) {
   const mv = s.match(/^\(([^)]+)\)\s*/); if (mv) { venditore = mv[1].trim(); s = s.slice(mv[0].length); }
   const mf = s.match(/(^|[^A-Za-z])(ST|INT|CC|RF)(?![A-Za-z])/i);           // sigla della fonte, dove sia nel titolo
   const fonte = mf ? SIGLE[mf[2].toUpperCase()] : null;
-  let resto = s;
-  if (mf) { const dopo = s.slice(mf.index! + mf[0].length).replace(/^[\s.:–-]+/, ""); if (dopo) resto = dopo; }
-  else { const md = s.match(/^(.*?)\s*[-–]\s*(.+)$/); if (md) resto = md[2]; }
+  let resto = s, prefisso = "";
+  if (mf) { prefisso = s.slice(0, mf.index! + mf[1].length); const dopo = s.slice(mf.index! + mf[0].length).replace(/^[\s.:–-]+/, ""); if (dopo) resto = dopo; }
+  else { const md = s.match(/^(.*?)\s*[-–]\s*(.+)$/); if (md) { prefisso = md[1]; resto = md[2]; } }
+  // zona: "TO" / "Piemonte" = Piemonte, "BO" / "Emilia" = Emilia-Romagna (scritti prima della sigla); altrimenti Lombardia
+  const mz = prefisso.match(/(^|[^A-Za-z])(TO|BO|PIEMONTE|EMILIA)(?![A-Za-z])/i);
+  const zona = mz ? (/^(TO|PIEMONTE)$/i.test(mz[2]) ? "P" : "E") : null;
   let telefono: string | null = null;
   const mt = resto.match(/\s*(\+?\d[\d .\/]{7,}\d)\s*$/); if (mt) { telefono = mt[1].replace(/[ .\/]/g, ""); resto = resto.slice(0, mt.index).trim(); }
   const cliente = resto.replace(/[\s–-]+$/, "").trim() || null;
-  return { venditore, fonte, cliente, telefono };
+  return { venditore, fonte, cliente, telefono, zona };
 }
 // Titoli che non sono appuntamenti: contengono «slot», oppure non hanno lettere, oppure hanno un contatore a cifre singole tipo 0-1-1
 const isPromemoria = (sum: string) => /\bslot\b/i.test(sum) || !/[A-Za-zÀ-ÿ]/.test(sum) || /(^|\s)\d(-\d)+(\s|$)/.test(sum);
@@ -112,14 +115,14 @@ function titoloEquivale(summary: string, r: any) {
   if (!summary || summary.includes(" · ")) return false;
   const t = daTitolo(summary), tf = t.fonte ? tipoPerFonte(t.fonte) : null;
   const same = (a: any, b: any) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
-  return same(t.cliente, r.cliente) && same(t.telefono, r.telefono) && same(t.venditore, r.venditore) && (tf ? tf.codice === r.tipo_codice : r.tipo_codice === "app_altro");
+  return same(t.cliente, r.cliente) && same(t.telefono, r.telefono) && same(t.venditore, r.venditore) && same(t.zona, r.zona) && (tf ? tf.codice === r.tipo_codice : r.tipo_codice === "app_altro");
 }
 
 // ── portale → Google: come deve apparire l'evento (titolo nel formato dell'ufficio) ──
 function eventoDa(r: any) {
   const t = tipoDi(r.tipo_codice), op = opDi(r.operatrice_id);
   const fonte = t?.codice === "app_altro" ? "" : (t?.fonte || t?.nome || "");
-  const sigla = fonte ? (siglaDi(fonte) || fonte) : "";
+  const sigla = fonte ? (siglaDi(fonte) || fonte) : "", zona = r.zona === "P" ? "TO " : r.zona === "E" ? "BO " : "";
   const demo = r.demo === "fatta" ? "fatta" + (r.demo_data ? " il " + r.demo_data.split("-").reverse().join("/") : "") : r.demo === "non_fatta" ? "non fatta" : "da fare";
   const desc = [
     r.telefono ? "Telefono: " + r.telefono : "", "Fonte: " + (fonte || "non indicata"), "Telefonista: " + (op?.nome || "nessuna"),
@@ -127,7 +130,7 @@ function eventoDa(r: any) {
     "", "— Portale Call Center #" + r.id,
   ].filter((x) => x !== "").join("\n");
   const ev: any = {
-    summary: `${r.venditore ? "(" + r.venditore + ") " : ""}${sigla ? sigla + " - " : ""}${r.cliente || "Cliente non indicato"}${r.telefono ? " " + r.telefono : ""}`,
+    summary: `${r.venditore ? "(" + r.venditore + ") " : ""}${zona}${sigla ? sigla + " - " : ""}${r.cliente || "Cliente non indicato"}${r.telefono ? " " + r.telefono : ""}`,
     location: r.indirizzo || "", description: desc, colorId: COLORI[t?.colore || "blue"] || "9",
     extendedProperties: { private: { cc_id: String(r.id) } },
   };
@@ -200,7 +203,7 @@ async function applica(ev: any, riga: any) {
     // importato (solo calendario) cancellato su Google: via anche dal portale, non era nelle statistiche
     if (riga?.solo_calendario) { await sb.from("cc_registrazioni").delete().eq("id", riga.id); return "importato cancellato #" + riga.id; }
     // cancellato su Google: lo tolgo dal calendario del portale ma l'appuntamento preso resta nelle statistiche
-    if (riga && riga.data_appuntamento) await sb.from("cc_registrazioni").update({ data_appuntamento: null, ora_appuntamento: null, google_event_id: null, note: [riga.note, "tolto dal calendario Google"].filter(Boolean).join(" · ") }).eq("id", riga.id);
+    if (riga && riga.data_appuntamento) await sb.from("cc_registrazioni").update({ data_appuntamento: null, ora_appuntamento: null, google_event_id: null, google_sync_at: new Date().toISOString(), note: [riga.note, "tolto dal calendario Google"].filter(Boolean).join(" · ") }).eq("id", riga.id);
     return riga ? "tolto dal calendario" : "ignorato";
   }
   const tuttoIlGiorno = !!ev.start?.date;
@@ -209,7 +212,7 @@ async function applica(ev: any, riga: any) {
   const durata = fine ? Math.max(15, Math.round((new Date(ev.end.dateTime).getTime() - new Date(ev.start.dateTime).getTime()) / 60000)) : (riga?.durata_min || 60);
   const desc = ev.description || "", sum = ev.summary || "", tit = daTitolo(sum);
   const cliente = sum.includes(" · ") ? sum.split(" · ")[0].trim() || null : tit.cliente;
-  const agg: any = { data_appuntamento: inizio.data, ora_appuntamento: inizio.ora, durata_min: durata, indirizzo: ev.location || null, google_event_id: ev.id, google_sync_at: new Date().toISOString() };
+  const agg: any = { data_appuntamento: inizio.data, ora_appuntamento: inizio.ora, durata_min: durata, indirizzo: ev.location || null, zona: tit.zona, google_event_id: ev.id, google_sync_at: new Date().toISOString() };
   if (cliente && cliente !== "Cliente non indicato") agg.cliente = cliente;
   const tel = campo(desc, "Telefono") ?? tit.telefono, ven = campo(desc, "Venditore") ?? tit.venditore, note = noteDa(desc);
   if (tel !== null) agg.telefono = tel || null;
