@@ -182,11 +182,11 @@ function disegnaCalendario(){
 function disegnaAgenda(perG,maxGiorno){
   const el=document.getElementById('cal');el.className='cal agenda';
   const H=el.clientHeight-84,fs=Math.max(10,Math.min(14,Math.floor(((H/maxGiorno)-4)/1.25)));el.style.setProperty('--ag-fs',fs+'px');
-  const adesso=new Date(),minOra=adesso.getHours()*60+adesso.getMinutes(),oggi=oggiIso();
+  const adesso=new Date(),minOra=adesso.getHours()*60+adesso.getMinutes(),oggi=oggiIso(),largo=el.clientWidth/6>230;   // colonne strette (TV con le due metà): niente venditore, così si legge tutto il nome
   el.innerHTML=giorni.map(g=>{const d=isoToDate(g),lista=(perG[g]||[]).slice().sort((a,b)=>(hm(a.ora_appuntamento)||'99')>(hm(b.ora_appuntamento)||'99')?1:-1);
     return `<div class="ag-col${g===oggi?' today':''}"><div class="cal-wh${g===oggi?' today':''}"><div class="d">${GIORNI_BREVI[d.getDay()]}</div><div class="n">${d.getDate()}</div><div class="k">${lista.length} appuntamenti</div></div>
       <div class="ag-list">${lista.map(e=>{const t=tipoDi(e.tipo_codice),passato=g<oggi||(g===oggi&&e.ora_appuntamento&&minuti(e.ora_appuntamento)+(e.durata_min||60)<minOra);
-        return `<div class="ag-ev${e.demo==='fatta'?' fatta':''}${passato?' passato':''}" style="border-left-color:${COLORE_HEX[t.colore]||'#636366'}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.venditore?' · '+e.venditore:''))}"><span class="h">${e.ora_appuntamento?hm(e.ora_appuntamento):'—'}</span><span class="c">${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</span>${e.venditore?`<span class="v">${esc(e.venditore)}</span>`:''}</div>`;}).join('')}</div></div>`;}).join('');
+        return `<div class="ag-ev${e.demo==='fatta'?' fatta':''}${passato?' passato':''}" style="border-left-color:${COLORE_HEX[t.colore]||'#636366'}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.venditore?' · '+e.venditore:''))}"><span class="h">${e.ora_appuntamento?hm(e.ora_appuntamento):'—'}</span><span class="c">${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</span>${largo&&e.venditore?`<span class="v">${esc(e.venditore)}</span>`:''}</div>`;}).join('')}</div></div>`;}).join('');
 }
 // ── lavagna ──
 function fasciaDi(e){const m=minuti(e.ora_appuntamento);if(m==null)return -1;return FASCE.findIndex(f=>m>=f.da&&m<f.a);}
