@@ -290,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.9 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.0 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -549,7 +549,7 @@ let _giornoOp=null;
 async function loadOggiOp(){
   _giornoOp=oggiIso();
   const [regs,turni,turniOggi]=await Promise.all([
-    api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&select=*&order=ora.desc`),
+    api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&solo_calendario=is.false&select=*&order=ora.desc`),
     api(`cc_turni?operatrice_id=eq.${currentUser.id}&fine=is.null&select=*&order=inizio.desc`),
     api(`cc_turni?operatrice_id=eq.${currentUser.id}&data=eq.${_giornoOp}&select=id&limit=1`)
   ]);
@@ -700,7 +700,7 @@ async function loadAppOp(){
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   const {start,end}=meseRange(mese),cod=[...codiciGruppo('appuntamenti')];
   if(!cod.length){el.innerHTML='<div class="empty">Nessuna attività di tipo appuntamento.</div>';return;}
-  const regs=await api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&tipo_codice=in.(${cod.join(',')})&select=*&order=ora.desc`);
+  const regs=await api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&tipo_codice=in.(${cod.join(',')})&solo_calendario=is.false&select=*&order=ora.desc`);
   const n=contaDemo(regs);
   el.innerHTML=`<div class="metrics"><div class="metric"><div class="val">${n.app}</div><div class="lbl">Appuntamenti presi</div></div><div class="metric"><div class="val c-green">${n.fatte}</div><div class="lbl">Demo fatte</div>${n.app?`<div class="sub">${pct(n.fatte,n.app)}% dei tuoi appuntamenti</div>`:''}</div><div class="metric"><div class="val c-red">${n.non}</div><div class="lbl">Demo non fatte</div></div><div class="metric"><div class="val">${n.da}</div><div class="lbl">Demo da fare</div></div></div>
     <div class="muted" style="padding:0 4px 8px">La demo la segna l'ufficio: qui la vedi e basta.</div>
@@ -713,7 +713,7 @@ async function loadStoricoOp(){
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   const {start,end}=meseRange(mese);
   const [regs,turni]=await Promise.all([
-    api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=id,tipo_codice,data,ora`),
+    api(`cc_registrazioni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&solo_calendario=is.false&select=id,tipo_codice,data,ora`),
     api(`cc_turni?operatrice_id=eq.${currentUser.id}&data=gte.${start}&data=lte.${end}&select=*`)]);
   const cols=colonneCompatte(tipiMiei()),G=haGruppi()&&cols.length>1;
   const regsG={};regs.forEach(r=>(regsG[r.data]=regsG[r.data]||[]).push(r));
@@ -781,11 +781,12 @@ function onPeriodoChange(){
   const f={'tab-live':renderLive,'tab-operatrici':renderOperatrici,'tab-andamento':renderAndamento,'tab-registrazioni':renderRegistrazioni,'tab-appuntamenti':renderAppuntamenti}[tabAttivo()];
   if(f)f();
 }
+// Le righe «solo calendario» (eventi già su Google prima del collegamento) non entrano qui: contano solo nel calendario e sulla lavagna
 async function datiPeriodo(p){
   const k=p.start+'|'+p.end;
   if(_cache[k])return _cache[k];
   const [regs,turni]=await Promise.all([
-    api(`cc_registrazioni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=ora.desc`),
+    api(`cc_registrazioni?data=gte.${p.start}&data=lte.${p.end}&solo_calendario=is.false&select=*&order=ora.desc`),
     api(`cc_turni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=inizio.desc`)]);
   return _cache[k]={regs,turni};
 }
@@ -895,7 +896,7 @@ function periodiTrend(){
   else{const d0=new Date();for(let i=5;i>=0;i--){const d=new Date(d0.getFullYear(),d0.getMonth()-i,1),r=meseRange(yyyymm(d));out.push({start:r.start,end:r.end,label:MESI_BREVI[d.getMonth()]+' '+String(d.getFullYear()).slice(2)});}}
   return out;
 }
-async function regsTrend(start,end){const k=start+'|'+end;if(!_trendRegs[k])_trendRegs[k]=await api(`cc_registrazioni?data=gte.${start}&data=lte.${end}&select=id,operatrice_id,tipo_codice,data,demo`);return _trendRegs[k];}
+async function regsTrend(start,end){const k=start+'|'+end;if(!_trendRegs[k])_trendRegs[k]=await api(`cc_registrazioni?data=gte.${start}&data=lte.${end}&solo_calendario=is.false&select=id,operatrice_id,tipo_codice,data,demo`);return _trendRegs[k];}
 function applicaScalaTrend(){
   const mn=document.getElementById('trend-min').value,mx=document.getElementById('trend-max').value;
   if(mn===''||mx===''||isNaN(+mn)||isNaN(+mx)||+mn>=+mx)return;   // sta ancora scrivendo
@@ -1229,12 +1230,14 @@ function apriEvento(id,data,ora){
   if(id&&!e)return toast('Appuntamento non trovato');
   const ro=!_calEdit&&currentUser?.ruolo!=='admin';
   const appTipi=tipiAttivi().filter(t=>t.gruppo==='appuntamenti');
+  if(e&&!appTipi.some(t=>t.codice===e.tipo_codice)&&tipoDi(e.tipo_codice).gruppo==='appuntamenti')appTipi.push(tipoDi(e.tipo_codice));   // es. «Non indicata» (arrivato da Google)
   const ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||(e&&o.id===e.operatrice_id)));
   const venditori=[...new Set(_calEvs.map(x=>x.venditore).filter(Boolean))].sort();
   const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:60,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',note:''};
   if(e&&data&&!e.data_appuntamento)v.data_appuntamento=data;
   const dis=ro?'disabled':'';
-  apriModal(`<h2>${id?(ro?'Appuntamento':'Modifica appuntamento'):'Nuovo appuntamento'}</h2>${e?`<div class="muted">Preso ${labelGiorno(e.data)} ${hhmm(e.ora)} da ${esc(opDi(e.operatrice_id).nome)}</div>`:''}
+  apriModal(`<h2>${id?(ro?'Appuntamento':'Modifica appuntamento'):'Nuovo appuntamento'}</h2>${e?`<div class="muted">${e.solo_calendario?'Importato da Google Calendar · creato':'Preso'} ${labelGiorno(e.data)} ${hhmm(e.ora)}${e.solo_calendario&&!e.operatrice_id?'':' da '+esc(opDi(e.operatrice_id).nome)}</div>`:''}
+    ${e&&e.solo_calendario?`<div class="alert alert-info" style="margin:10px 0"><b>Solo calendario:</b> era già su Google prima del collegamento, quindi sta nel calendario e sulla lavagna ma non conta nelle statistiche (quei numeri sono già nei dati caricati).${ro?'':` <button class="btn btn-xs" style="margin-left:6px" onclick="contaInStatistiche(${e.id})">Fallo contare</button>`}</div>`:''}
     <label>Cliente</label><input id="ev-cliente" value="${esc(v.cliente||'')}" placeholder="Nome e cognome" ${dis}>
     <div class="two-col"><div><label>Telefono</label><input id="ev-telefono" inputmode="tel" value="${esc(v.telefono||'')}" ${dis}></div><div><label>Fonte</label><select id="ev-tipo" ${dis}>${appTipi.map(t=>`<option value="${t.codice}" ${t.codice===v.tipo_codice?'selected':''}>${esc(t.fonte||t.nome)}</option>`).join('')}</select></div></div>
     <label>Indirizzo</label><input id="ev-indirizzo" value="${esc(v.indirizzo||'')}" placeholder="Via, città" ${dis}>
@@ -1256,6 +1259,7 @@ async function salvaEvento(id){
   }catch(e){toast('Errore: '+e.message);}
 }
 async function eliminaEvento(id){if(!confirm('Eliminare questo appuntamento? Sparisce anche dalle statistiche.'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'DELETE');chiudiModal();invalidaCache();renderCalendario();onPeriodoChange();}catch(e){toast('Errore: '+e.message);}}
+async function contaInStatistiche(id){if(!confirm('Da ora questo appuntamento conta nelle statistiche come preso il giorno indicato. Confermi?'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{solo_calendario:false});invalidaCache();chiudiModal();renderCalendario();toast('Ora conta nelle statistiche');}catch(e){toast('Errore: '+e.message);}}
 async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});invalidaCache();chiudiModal();renderCalendario();toast('Demo aggiornata');}catch(e){toast('Errore: '+e.message);}}
 
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──

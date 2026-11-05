@@ -52,6 +52,7 @@ create table if not exists cc_registrazioni (
   note              text,
   demo              text check (demo in ('fatta','non_fatta')),  -- segnata dall'admin sugli appuntamenti
   demo_data         date,
+  solo_calendario   boolean     not null default false,         -- true = evento già su Google prima del collegamento: calendario sì, statistiche no
   created_at        timestamptz not null default now()
 );
 create index if not exists cc_registrazioni_data_idx on cc_registrazioni(data);
@@ -109,6 +110,10 @@ insert into cc_tipi (codice, nome, descrizione, icona, colore, ordine, gruppo, f
   ('app_internet',       'App. presi Internet',  'Appuntamento da contatto Internet',  'ti-calendar-check', 'indigo', 6, 'appuntamenti', 'Internet',  true,  0),
   ('contatto_referenze', 'Contatti Referenze',   'Contatti da referenze',              'ti-users',          'green',  7, 'contatti',     'Referenze', false, 0),
   ('app_referenze',      'App. presi Referenze', 'Appuntamento da contatto Referenze', 'ti-calendar-check', 'green',  8, 'appuntamenti', 'Referenze', true,  0)
+on conflict (codice) do nothing;
+-- Appuntamenti senza fonte (es. scritti a mano su Google Calendar): grigi, non proposti alle telefoniste
+insert into cc_tipi (codice, nome, descrizione, icona, colore, ordine, gruppo, fonte, chiede_dettaglio, obiettivo_giorno, attivo) values
+  ('app_altro', 'App. fonte non indicata', 'Appuntamento arrivato da Google Calendar senza fonte: la fonte la mette l''ufficio dal calendario', 'ti-calendar-question', 'gray', 9, 'appuntamenti', 'Non indicata', true, 0, false)
 on conflict (codice) do nothing;
 
 -- Primo accesso admin (PIN provvisorio 0000: cambiarlo subito da Gestione → Operatrici)

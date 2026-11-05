@@ -7,3 +7,5 @@
 - La data «giorno» (`data`) si calcola nel browser (ora italiana) e si manda sempre esplicita: mai affidarsi a `current_date` del server (UTC).
 - Per provare senza database: copia di `index.html` senza lo script supabase-js e con un `mock.js` in fondo che ridefinisce `window.api`.
 - Si risponde in italiano, corto e schematico.
+- Righe con `solo_calendario = true` (eventi importati da Google Calendar): calendario e lavagna TV sì, statistiche no. Ogni lettura di `cc_registrazioni` per le statistiche filtra `solo_calendario=is.false`.
+- Mai inventare attribuzioni: un appuntamento senza fonte certa è `app_altro` («Fonte non indicata»), senza telefonista è `operatrice_id` null.

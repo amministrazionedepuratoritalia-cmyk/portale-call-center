@@ -126,7 +126,7 @@ function titoloSett(){const a=isoToDate(giorni[0]),b=isoToDate(giorni[5]);return
 
 async function carica(){
   try{
-    const [t,o]=await Promise.all([api('cc_tipi?select=codice,nome,fonte,gruppo,colore,icona&order=ordine'),api('cc_operatrici?select=id,nome')]);
+    const [t,o]=await Promise.all([api('cc_tipi?select=codice,nome,fonte,gruppo,colore,icona,attivo&order=ordine'),api('cc_operatrici?select=id,nome')]);
     tipi=t;operatrici=o;
     const cod=tipi.filter(x=>x.gruppo==='appuntamenti').map(x=>x.codice);
     evs=cod.length?await api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${giorni[0]}&data_appuntamento=lte.${giorni[5]}&select=id,operatrice_id,tipo_codice,cliente,indirizzo,venditore,data_appuntamento,ora_appuntamento,durata_min,demo&order=data_appuntamento,ora_appuntamento`):[];
@@ -134,7 +134,9 @@ async function carica(){
     document.getElementById('agg').textContent='aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
   }catch(e){document.getElementById('agg').textContent='errore: '+e.message;}
 }
-function legenda(){const f=[...new Set(tipi.filter(t=>t.gruppo==='appuntamenti').map(t=>t.fonte||t.nome))];return f.map(x=>{const t=tipi.find(y=>(y.fonte||y.nome)===x);return `<span><i style="background:${COLORE_HEX[t.colore]||'#000'}"></i>${esc(x)}</span>`;}).join('')+'<span><i style="background:repeating-linear-gradient(45deg,#fff 0 3px,#bbb 3px 6px);border:1px solid #999"></i>demo fatta</span>';}
+// fonti mostrate: quelle attive, più «Non indicata» solo se in settimana c'è qualche appuntamento senza fonte (arrivato da Google)
+function fontiMostrate(){return [...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&(t.attivo||evs.some(e=>e.tipo_codice===t.codice))).map(t=>t.fonte||t.nome))];}
+function legenda(){const f=fontiMostrate();return f.map(x=>{const t=tipi.find(y=>(y.fonte||y.nome)===x);return `<span><i style="background:${COLORE_HEX[t.colore]||'#000'}"></i>${esc(x)}</span>`;}).join('')+'<span><i style="background:repeating-linear-gradient(45deg,#fff 0 3px,#bbb 3px 6px);border:1px solid #999"></i>demo fatta</span>';}
 function disegna(){
   document.getElementById('sett').textContent='Settimana '+titoloSett();
   const l=legenda();['leg1','leg2'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=l;});
@@ -175,7 +177,7 @@ function disegnaLavagna(){
     });
   });
   // totali della settimana per fonte, come la riga in basso della lavagna
-  const fonti=[...new Set(tipi.filter(t=>t.gruppo==='appuntamenti').map(t=>t.fonte||t.nome))];
+  const fonti=fontiMostrate();
   const sigla=f=>({'CC':'C.C.','Stand':'ST.','Internet':'INTERNET','Referenze':'R.F.'})[f]||f.toUpperCase();
   h+=`<div class="tot">${fonti.map(f=>{const lista=evs.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),t=tipi.find(y=>(y.fonte||y.nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length;const n=Math.max(CASELLE_TOT,Math.ceil(lista.length/10)*10);return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} appuntamenti${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle">${lista.map(e=>`<div class="casella piena" style="background:${COLORE_HEX[t.colore]};border-color:${COLORE_HEX[t.colore]}" title="${esc((e.cliente||'')+' · '+opDi(e.operatrice_id).nome)}">${e.demo==='fatta'?'✓':''}</div>`).join('')}${Array(n-lista.length).fill('<div class="casella"></div>').join('')}</div></div>`;}).join('')}</div>`;
   el.innerHTML=h;
