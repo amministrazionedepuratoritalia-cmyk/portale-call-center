@@ -82,10 +82,33 @@ function locale(dt: string) {
   return { data: `${g("year")}-${g("month")}-${g("day")}`, ora: `${g("hour") === "24" ? "00" : g("hour")}:${g("minute")}` };
 }
 
-// ── portale → Google: come deve apparire l'evento ──
+// ── titoli come li scrive l'ufficio su Google: "(Venditore) ST - Nome Cognome 3331234567", "TO riconf.CC - Nome", "INT - Nome" ──
+const SIGLE: Record<string, string> = { ST: "Stand", INT: "Internet", CC: "CC", RF: "Referenze" };
+const siglaDi = (fonte: string) => Object.keys(SIGLE).find((k) => SIGLE[k].toLowerCase() === (fonte || "").toLowerCase()) || "";
+function daTitolo(summary: string) {
+  let s = (summary || "").trim(), venditore: string | null = null;
+  const mv = s.match(/^\(([^)]+)\)\s*/); if (mv) { venditore = mv[1].trim(); s = s.slice(mv[0].length); }
+  const mf = s.match(/(^|[^A-Za-z])(ST|INT|CC|RF)(?![A-Za-z])/i);           // sigla della fonte, dove sia nel titolo
+  const fonte = mf ? SIGLE[mf[2].toUpperCase()] : null;
+  let resto = s;
+  if (mf) { const dopo = s.slice(mf.index! + mf[0].length).replace(/^[\s.:–-]+/, ""); if (dopo) resto = dopo; }
+  else { const md = s.match(/^(.*?)\s*[-–]\s*(.+)$/); if (md) resto = md[2]; }
+  let telefono: string | null = null;
+  const mt = resto.match(/\s*(\+?\d[\d .\/]{7,}\d)\s*$/); if (mt) { telefono = mt[1].replace(/[ .\/]/g, ""); resto = resto.slice(0, mt.index).trim(); }
+  const cliente = resto.replace(/[\s–-]+$/, "").trim() || null;
+  return { venditore, fonte, cliente, telefono };
+}
+function tipoPerFonte(nome: string) {
+  const n = (nome || "").trim().toLowerCase(); if (!n) return null;
+  return _tipi.find((x) => x.gruppo === "appuntamenti" && (x.fonte || x.nome).toLowerCase() === n) ||
+    _tipi.find((x) => x.gruppo === "appuntamenti" && (x.fonte || "").toLowerCase().startsWith(n.slice(0, 3))) || null;
+}
+
+// ── portale → Google: come deve apparire l'evento (titolo nel formato dell'ufficio) ──
 function eventoDa(r: any) {
   const t = tipoDi(r.tipo_codice), op = opDi(r.operatrice_id);
   const fonte = t?.codice === "app_altro" ? "" : (t?.fonte || t?.nome || "");
+  const sigla = fonte ? (siglaDi(fonte) || fonte) : "";
   const demo = r.demo === "fatta" ? "fatta" + (r.demo_data ? " il " + r.demo_data.split("-").reverse().join("/") : "") : r.demo === "non_fatta" ? "non fatta" : "da fare";
   const desc = [
     r.telefono ? "Telefono: " + r.telefono : "", "Fonte: " + (fonte || "non indicata"), "Telefonista: " + (op?.nome || "nessuna"),
@@ -93,7 +116,7 @@ function eventoDa(r: any) {
     "", "— Portale Call Center #" + r.id,
   ].filter((x) => x !== "").join("\n");
   const ev: any = {
-    summary: `${r.cliente || "Cliente non indicato"}${fonte ? " · " + fonte : ""}${op ? " · " + op.nome.split(" ")[0] : ""}`,
+    summary: `${r.venditore ? "(" + r.venditore + ") " : ""}${sigla ? sigla + " - " : ""}${r.cliente || "Cliente non indicato"}${r.telefono ? " " + r.telefono : ""}`,
     location: r.indirizzo || "", description: desc, colorId: COLORI[t?.colore || "blue"] || "9",
     extendedProperties: { private: { cc_id: String(r.id) } },
   };
@@ -139,13 +162,14 @@ async function push(tipo: string, record: any, old: any) {
 }
 
 // ── Google → portale ──
+// Fonte: dalla riga «Fonte:» della descrizione (nostro formato), altrimenti dalla sigla nel titolo (ST / INT / CC / RF), altrimenti «non indicata»
 function fonteDa(ev: any): string {
-  const testo = (ev.summary || "") + " " + (ev.description || "");
-  const m = testo.match(/Fonte:\s*([^\n]+)/i);
-  const nome = (m ? m[1] : (ev.summary || "").split(" · ")[1] || "").trim().toLowerCase();
-  const t = _tipi.find((x) => x.gruppo === "appuntamenti" && (x.fonte || x.nome).toLowerCase() === nome) ||
-    _tipi.find((x) => x.gruppo === "appuntamenti" && nome && (x.fonte || "").toLowerCase().startsWith(nome.slice(0, 3)));
-  return t?.codice || FONTE_DEFAULT;
+  const m = (ev.description || "").match(/^Fonte:\s*([^\n]+)/im);
+  const daDesc = m ? tipoPerFonte(m[1]) : null; if (daDesc) return daDesc.codice;
+  const sum = ev.summary || "";
+  const vecchio = sum.includes(" · ") ? tipoPerFonte(sum.split(" · ")[1] || "") : null; if (vecchio) return vecchio.codice;
+  const tit = daTitolo(sum); const daTit = tit.fonte ? tipoPerFonte(tit.fonte) : null;
+  return daTit?.codice || FONTE_DEFAULT;
 }
 function campo(desc: string, k: string) { const m = (desc || "").match(new RegExp("^" + k + ":\\s*(.*)$", "mi")); return m ? m[1].trim() : null; }
 // Note: nel nostro formato stanno dopo «Note:» fino al marcatore finale (anche su più righe);
@@ -174,11 +198,11 @@ async function applica(ev: any) {
   const inizio = tuttoIlGiorno ? { data: ev.start.date, ora: null } : locale(ev.start.dateTime);
   const fine = tuttoIlGiorno ? null : locale(ev.end.dateTime);
   const durata = fine ? Math.max(15, Math.round((new Date(ev.end.dateTime).getTime() - new Date(ev.start.dateTime).getTime()) / 60000)) : (riga?.durata_min || 60);
-  const desc = ev.description || "";
-  const cliente = (ev.summary || "").split(" · ")[0].trim() || null;
+  const desc = ev.description || "", sum = ev.summary || "", tit = daTitolo(sum);
+  const cliente = sum.includes(" · ") ? sum.split(" · ")[0].trim() || null : tit.cliente;
   const agg: any = { data_appuntamento: inizio.data, ora_appuntamento: inizio.ora, durata_min: durata, indirizzo: ev.location || null, google_event_id: ev.id, google_sync_at: new Date().toISOString() };
   if (cliente && cliente !== "Cliente non indicato") agg.cliente = cliente;
-  const tel = campo(desc, "Telefono"), ven = campo(desc, "Venditore"), note = noteDa(desc);
+  const tel = campo(desc, "Telefono") ?? tit.telefono, ven = campo(desc, "Venditore") ?? tit.venditore, note = noteDa(desc);
   if (tel !== null) agg.telefono = tel || null;
   if (ven !== null) agg.venditore = ven || null;
   if (note !== null) agg.note = note || null;
@@ -193,6 +217,8 @@ async function applica(ev: any) {
     await sb.from("cc_registrazioni").update(agg).eq("id", riga.id);
     return "riga aggiornata #" + riga.id;
   }
+  // promemoria dell'ufficio (es. "6-7-7-7 slot Lombardia"): non è un appuntamento
+  if (/\bslot\b/i.test(sum)) return "promemoria, non un appuntamento";
   // evento nuovo creato direttamente su Google: diventa un appuntamento preso (senza telefonista, salvo "Telefonista: Nome").
   // Se era già su Google prima del collegamento (GCAL_IMPORTATO_IL) sta solo nel calendario: nelle statistiche c'è già, dai report.
   const tf = campo(desc, "Telefonista"); const op = tf ? _ops.find((o) => o.nome.toLowerCase().startsWith(tf.toLowerCase().split(" ")[0])) : null;
