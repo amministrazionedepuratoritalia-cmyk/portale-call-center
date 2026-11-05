@@ -45,6 +45,20 @@
     .blk { position:absolute; left:2px; right:2px; border-radius:6px; padding:3px 6px; font-size:12px; line-height:1.2; overflow:hidden; border-left:4px solid; box-shadow:0 1px 2px rgba(0,0,0,.08); }
     .blk b { display:block; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .blk.fatta { opacity:.6; }
+    /* settimana piena (più di 10 appuntamenti in un giorno): elenco per giorno, leggibile da lontano */
+    .cal.agenda { grid-template-columns:repeat(6,1fr); grid-template-rows:1fr; }
+    .ag-col { display:flex; flex-direction:column; min-height:0; border-left:0.5px solid var(--sep); }
+    .ag-col:first-child { border-left:none; }
+    .ag-col.today { background:#F7FAFF; }
+    .ag-col .cal-wh { border-left:none; }
+    .ag-col .k { font-size:10px; color:var(--text3); margin-top:2px; }
+    .ag-list { flex:1; min-height:0; overflow:hidden; padding:3px 4px; display:flex; flex-direction:column; gap:2px; }
+    .ag-ev { display:flex; align-items:baseline; gap:5px; border-left:4px solid; border-radius:4px; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.05); padding:1px 5px; font-size:var(--ag-fs,12px); line-height:1.25; white-space:nowrap; overflow:hidden; }
+    .ag-ev .h { font-weight:700; font-variant-numeric:tabular-nums; flex:none; }
+    .ag-ev .c { overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+    .ag-ev .v { color:var(--text3); font-size:.9em; overflow:hidden; text-overflow:ellipsis; flex:none; max-width:38%; }
+    .ag-ev.fatta { opacity:.55; }
+    .ag-ev.passato { opacity:.7; }
     .cal-now { position:absolute; left:0; right:0; height:2px; background:#FF3B30; z-index:2; }
 
     /* ── lavagna ── */
@@ -152,6 +166,9 @@ function layoutEv(lista){
 function disegnaCalendario(){
   const el=document.getElementById('cal');
   const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
+  const maxGiorno=Math.max(0,...giorni.map(g=>(perG[g]||[]).length));
+  if(maxGiorno>10){disegnaAgenda(perG,maxGiorno);return;}
+  el.className='cal';
   const H=el.clientHeight-80, hh=Math.max(28,H/(CAL_H1-CAL_H0));
   const ore=[];for(let h=CAL_H0;h<=CAL_H1;h++)ore.push(h);
   const adesso=new Date(),minOra=adesso.getHours()*60+adesso.getMinutes();
@@ -160,6 +177,16 @@ function disegnaCalendario(){
     <div class="cal-gutter" style="height:${hh*(CAL_H1-CAL_H0)}px">${ore.map(h=>`<div style="top:${(h-CAL_H0)*hh-6}px">${h}:00</div>`).join('')}</div>
     ${giorni.map(g=>`<div class="cal-col${g===oggiIso()?' today':''}" style="height:${hh*(CAL_H1-CAL_H0)}px;background-size:100% ${hh}px">${layoutEv((perG[g]||[]).filter(e=>e.ora_appuntamento)).map(x=>{const e=x.e,t=tipoDi(e.tipo_codice),m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*hh/60),h=Math.max(20,(e.durata_min||60)*hh/60),o=opDi(e.operatrice_id);return `<div class="blk bg-${t.colore}${e.demo==='fatta'?' fatta':''}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(x.col*100/x.ncol).toFixed(2)}% + 2px);width:calc(${(100/x.ncol).toFixed(2)}% - 4px);border-left-color:${COLORE_HEX[t.colore]}"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([t.fonte||t.nome,o.senza?'':o.nome.split(' ')[0],e.venditore?'→ '+e.venditore:''].filter(Boolean).join(' · '))}</div>`;}).join('')}${g===oggiIso()&&minOra>=CAL_H0*60&&minOra<=CAL_H1*60?`<div class="cal-now" style="top:${((minOra-CAL_H0*60)*hh/60).toFixed(0)}px"></div>`:''}</div>`).join('')}`;
   // porta in vista l'ora corrente? il pannello non scorre: le ore 8–22 stanno nell'altezza del pannello
+}
+// Settimana piena: ogni giorno è un elenco ordinato per ora (ora · cliente · venditore), colore della fonte a sinistra
+function disegnaAgenda(perG,maxGiorno){
+  const el=document.getElementById('cal');el.className='cal agenda';
+  const H=el.clientHeight-84,fs=Math.max(10,Math.min(14,Math.floor(((H/maxGiorno)-4)/1.25)));el.style.setProperty('--ag-fs',fs+'px');
+  const adesso=new Date(),minOra=adesso.getHours()*60+adesso.getMinutes(),oggi=oggiIso();
+  el.innerHTML=giorni.map(g=>{const d=isoToDate(g),lista=(perG[g]||[]).slice().sort((a,b)=>(hm(a.ora_appuntamento)||'99')>(hm(b.ora_appuntamento)||'99')?1:-1);
+    return `<div class="ag-col${g===oggi?' today':''}"><div class="cal-wh${g===oggi?' today':''}"><div class="d">${GIORNI_BREVI[d.getDay()]}</div><div class="n">${d.getDate()}</div><div class="k">${lista.length} appuntamenti</div></div>
+      <div class="ag-list">${lista.map(e=>{const t=tipoDi(e.tipo_codice),passato=g<oggi||(g===oggi&&e.ora_appuntamento&&minuti(e.ora_appuntamento)+(e.durata_min||60)<minOra);
+        return `<div class="ag-ev${e.demo==='fatta'?' fatta':''}${passato?' passato':''}" style="border-left-color:${COLORE_HEX[t.colore]||'#636366'}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.venditore?' · '+e.venditore:''))}"><span class="h">${e.ora_appuntamento?hm(e.ora_appuntamento):'—'}</span><span class="c">${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</span>${e.venditore?`<span class="v">${esc(e.venditore)}</span>`:''}</div>`;}).join('')}</div></div>`;}).join('');
 }
 // ── lavagna ──
 function fasciaDi(e){const m=minuti(e.ora_appuntamento);if(m==null)return -1;return FASCE.findIndex(f=>m>=f.da&&m<f.a);}
