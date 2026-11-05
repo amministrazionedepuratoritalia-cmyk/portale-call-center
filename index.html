@@ -265,7 +265,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.6 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v2.7 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -757,7 +757,7 @@ async function datiPeriodo(p){
     api(`cc_turni?data=gte.${p.start}&data=lte.${p.end}&select=*&order=inizio.desc`)]);
   return _cache[k]={regs,turni};
 }
-function invalidaCache(){Object.keys(_cache).forEach(k=>delete _cache[k]);}
+function invalidaCache(){Object.keys(_cache).forEach(k=>delete _cache[k]);_trendRegs={};}
 async function avviaAdmin(){
   document.getElementById('admin-name').textContent=currentUser.nome;
   document.getElementById('admin-giorno').value=oggiIso();document.getElementById('admin-giorno').max=oggiIso();
@@ -837,26 +837,56 @@ const COLORE_HEX={blue:'#0071E3',green:'#1D8348',amber:'#B25000',red:'#CC1B1B',p
 function graficoLinea(etichette,valori,opt={}){
   const n=valori.length;if(!n)return'<div class="empty">Niente da mostrare.</div>';
   const col=COLORE_HEX[opt.colore]||COLORE_HEX.blue,fitto=n>12,passo=fitto?34:62,padL=34,padR=18,padT=26,padB=34;
-  const W=Math.max(360,padL+padR+passo*(n-1)),H=210,max=Math.max(1,...valori);
-  const x=i=>n===1?W/2:padL+i*(W-padL-padR)/(n-1),y=v=>padT+(H-padT-padB)*(1-v/max);
+  const W=Math.max(360,padL+padR+passo*(n-1)),H=210;
+  // Scala: automatica (0 → massimo) oppure quella scelta dall'admin (min – max)
+  const vmin=opt.min!=null?opt.min:0,vmax=opt.max!=null?opt.max:Math.max(1,...valori),span=(vmax-vmin)||1;
+  const x=i=>n===1?W/2:padL+i*(W-padL-padR)/(n-1),y=v=>padT+(H-padT-padB)*(1-(Math.min(Math.max(v,vmin),vmax)-vmin)/span);
   const pts=valori.map((v,i)=>[x(i),y(v)]);
-  const linea=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
-  const area=linea+` L${pts[n-1][0].toFixed(1)} ${y(0).toFixed(1)} L${pts[0][0].toFixed(1)} ${y(0).toFixed(1)} Z`;
-  const griglia=[0.5,1].map(f=>`<line x1="${padL}" x2="${W-padR}" y1="${y(max*f).toFixed(1)}" y2="${y(max*f).toFixed(1)}" stroke="rgba(0,0,0,0.08)" stroke-dasharray="3 3"/><text x="${padL-6}" y="${(y(max*f)+4).toFixed(1)}" font-size="10" fill="#8E8E93" text-anchor="end">${Math.round(max*f)}</text>`).join('');
-  const base=`<line x1="${padL}" x2="${W-padR}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="rgba(0,0,0,0.15)"/>`;
-  const punti=pts.map((q,i)=>{const ev=opt.evidenzia===i,off=opt.spenti&&opt.spenti[i];return `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${ev?5.5:4}" fill="${off?'#fff':col}" stroke="${col}" stroke-width="2"/>${valori[i]?`<text x="${q[0].toFixed(1)}" y="${(q[1]-10).toFixed(1)}" font-size="${fitto?10:12}" font-weight="700" fill="#000" text-anchor="middle">${valori[i]}</text>`:''}`;}).join('');
+  const seg=(a,b)=>pts.slice(a,b+1).map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+  const inCorso=opt.inCorso&&n>1;
+  const linea=inCorso?seg(0,n-2):seg(0,n-1),tratto=inCorso?seg(n-2,n-1):'';
+  const area=seg(0,n-1)+` L${pts[n-1][0].toFixed(1)} ${y(vmin).toFixed(1)} L${pts[0][0].toFixed(1)} ${y(vmin).toFixed(1)} Z`;
+  const fmt=v=>Number.isInteger(v)?v:v.toFixed(1).replace('.',',');
+  const griglia=[0.5,1].map(f=>{const v=vmin+span*f;return `<line x1="${padL}" x2="${W-padR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="rgba(0,0,0,0.08)" stroke-dasharray="3 3"/><text x="${padL-6}" y="${(y(v)+4).toFixed(1)}" font-size="10" fill="#8E8E93" text-anchor="end">${fmt(Math.round(v*10)/10)}</text>`;}).join('');
+  const base=`<line x1="${padL}" x2="${W-padR}" y1="${y(vmin).toFixed(1)}" y2="${y(vmin).toFixed(1)}" stroke="rgba(0,0,0,0.15)"/>${vmin?`<text x="${padL-6}" y="${(y(vmin)+4).toFixed(1)}" font-size="10" fill="#8E8E93" text-anchor="end">${fmt(vmin)}</text>`:''}`;
+  const punti=pts.map((q,i)=>{const ev=opt.evidenzia===i,off=opt.spenti&&opt.spenti[i],vuoto=off||(inCorso&&i===n-1);return `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${ev?5.5:4}" fill="${vuoto?'#fff':col}" stroke="${col}" stroke-width="2"/>${valori[i]?`<text x="${q[0].toFixed(1)}" y="${(q[1]-10).toFixed(1)}" font-size="${fitto?10:12}" font-weight="700" fill="#000" text-anchor="middle">${valori[i]}</text>`:''}`;}).join('');
   const labels=etichette.map((l,i)=>{const ev=opt.evidenzia===i,off=opt.spenti&&opt.spenti[i];return `<text x="${x(i).toFixed(1)}" y="${H-10}" font-size="${fitto?10:11}" font-weight="${ev?'700':'500'}" fill="${ev?'#0071E3':off?'#C7C7CC':'#636366'}" text-anchor="middle">${esc(l)}</text>`;}).join('');
-  return `<div class="table-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMinYMid meet" style="display:block;height:auto;max-height:${H}px;min-width:${fitto?W:0}px;font-family:inherit"><path d="${area}" fill="${col}" fill-opacity="0.08"/>${griglia}${base}<path d="${linea}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${punti}${labels}</svg></div>`;
+  return `<div class="table-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMinYMid meet" style="display:block;height:auto;max-height:${H}px;min-width:${fitto?W:0}px;font-family:inherit"><path d="${area}" fill="${col}" fill-opacity="0.08"/>${griglia}${base}<path d="${linea}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${tratto?`<path d="${tratto}" fill="none" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 4" stroke-linecap="round"/>`:''}${punti}${labels}</svg></div>`;
 }
+// ── TREND (come nel Portale Tecnici): ultimi 14 giorni / 8 settimane / 6 mesi, una metrica alla volta, scala a scelta ──
+let _trendRegs={},_scalaTrend={};
+function filtraMetrica(regs,metrica){if(metrica==='g:demo')return regs.filter(r=>isApp(r)&&r.demo==='fatta');const codici=metrica.startsWith('g:')?codiciGruppo(metrica.slice(2)):new Set([metrica]);return regs.filter(r=>codici.has(r.tipo_codice));}
+function periodiTrend(){
+  const oggi=oggiIso(),out=[];
+  if(_periodoMode==='giorno'){for(let i=13;i>=0;i--){const g=isoAddDays(oggi,-i);out.push({start:g,end:g,label:labelGiorno(g,false)});}}
+  else if(_periodoMode==='sett'){const c=inizioSettimanaDi(oggi);for(let i=7;i>=0;i--){const st=isoAddDays(c,-7*i);out.push({start:st,end:isoAddDays(st,6),label:labelGiorno(st,true).replace(/^\w+ /,'')});}}
+  else{const d0=new Date();for(let i=5;i>=0;i--){const d=new Date(d0.getFullYear(),d0.getMonth()-i,1),r=meseRange(yyyymm(d));out.push({start:r.start,end:r.end,label:MESI_BREVI[d.getMonth()]+' '+String(d.getFullYear()).slice(2)});}}
+  return out;
+}
+async function regsTrend(start,end){const k=start+'|'+end;if(!_trendRegs[k])_trendRegs[k]=await api(`cc_registrazioni?data=gte.${start}&data=lte.${end}&select=id,operatrice_id,tipo_codice,data,demo`);return _trendRegs[k];}
+function applicaScalaTrend(){
+  const mn=document.getElementById('trend-min').value,mx=document.getElementById('trend-max').value;
+  if(mn===''||mx===''||isNaN(+mn)||isNaN(+mx)||+mn>=+mx)return;   // sta ancora scrivendo
+  _scalaTrend[_metricaAnd]={min:+mn,max:+mx};renderAndamento();
+}
+function scalaAutoTrend(){delete _scalaTrend[_metricaAnd];renderAndamento();}
 async function renderAndamento(){
   const el=document.getElementById('tab-andamento'),p=periodoCorrente();
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
-  let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const per=periodiTrend();
+  let d,tregs;try{[d,tregs]=await Promise.all([datiPeriodo(p),regsTrend(per[0].start,per[per.length-1].end)]);d=filtraSquadra(d);tregs=filtraSquadra({regs:tregs,turni:[]}).regs;}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const ta=tipiAttivi(),G=haGruppi();
   const opzioni=(G?[{codice:'g:contatti',nome:'Tutti i contatti',colore:'blue'},{codice:'g:appuntamenti',nome:'Tutti gli appuntamenti',colore:'green'},{codice:'g:demo',nome:'Demo fatte',colore:'purple'}]:[]).concat(ta);
   if(!_metricaAnd||!opzioni.some(t=>t.codice===_metricaAnd))_metricaAnd=opzioni[0]?.codice;
   const t=opzioni.find(x=>x.codice===_metricaAnd)||tipoDi(_metricaAnd);
-  const regs=_metricaAnd==='g:demo'?d.regs.filter(r=>isApp(r)&&r.demo==='fatta'):(()=>{const codici=_metricaAnd.startsWith('g:')?codiciGruppo(_metricaAnd.slice(2)):new Set([_metricaAnd]);return d.regs.filter(r=>codici.has(r.tipo_codice));})();
+  const regs=filtraMetrica(d.regs,_metricaAnd);
+  // Trend: un punto per periodo, il periodo scelto nel menu è evidenziato, l'ultimo (in corso) è tratteggiato
+  const serie=filtraMetrica(tregs,_metricaAnd),valTrend=per.map(q=>serie.filter(r=>r.data>=q.start&&r.data<=q.end).length);
+  const selTrend=per.findIndex(q=>p.start>=q.start&&p.start<=q.end),scala=_scalaTrend[_metricaAnd]||{};
+  const titoloTrend=_periodoMode==='giorno'?'Trend ultimi 14 giorni':_periodoMode==='sett'?'Trend ultime 8 settimane <span style="font-weight:500;text-transform:none;letter-spacing:0">(giovedì → mercoledì)</span>':'Trend ultimi 6 mesi';
+  const trend=`<div class="section-title">${titoloTrend} · ${esc(t.nome)}</div><div class="card">
+    <div class="flex wrap" style="gap:8px;margin-bottom:10px"><span class="muted">Scala:</span><input id="trend-min" type="number" placeholder="min" value="${scala.min??''}" style="width:76px;padding:6px 8px;font-size:13px" onchange="applicaScalaTrend()"><span class="muted">–</span><input id="trend-max" type="number" placeholder="max" value="${scala.max??''}" style="width:76px;padding:6px 8px;font-size:13px" onchange="applicaScalaTrend()"><button class="btn btn-xs" onclick="scalaAutoTrend()">Auto</button><span class="muted" style="margin-left:auto">tratteggiato = periodo in corso</span></div>
+    ${graficoLinea(per.map(q=>q.label),valTrend,{colore:t.colore,evidenzia:selTrend,inCorso:per[per.length-1].end>=oggiIso(),min:scala.min,max:scala.max})}</div>`;
   // per ora del giorno (sempre)
   const perOra=Array(24).fill(0);regs.forEach(r=>perOra[new Date(r.ora).getHours()]++);
   const h0=Math.min(8,perOra.findIndex(v=>v>0)<0?8:perOra.findIndex(v=>v>0)),h1=Math.max(19,23-[...perOra].reverse().findIndex(v=>v>0));
@@ -873,8 +903,9 @@ async function renderAndamento(){
     blocco=`<div class="section-title">${esc(t.nome)} per telefonista</div><div class="card">${lista.length?lista.map(([id,n])=>`<div style="padding:5px 0"><div class="flex between"><span>${id==='null'?'Senza telefonista':nomeOp(+id)}</span><b>${n}</b></div><div class="bar-wrap"><div class="bar fill-${t.colore}" style="width:${pct(n,maxO)}%"></div></div></div>`).join(''):'<div class="empty">Niente in questo giorno.</div>'}</div>`;
   }
   const ore=[];for(let h=h0;h<=h1;h++)ore.push(h);
-  el.innerHTML=`${barraSquadre()}<div class="section-title">${esc(p.label)}${etichettaSquadra()}</div>
+  el.innerHTML=`${barraSquadre()}<div class="section-title">Cosa vuoi vedere${etichettaSquadra()}</div>
     <div class="seg seg-full" style="flex-wrap:wrap">${opzioni.map(x=>`<button class="${x.codice===_metricaAnd?'on':''}" onclick="_metricaAnd='${x.codice}';renderAndamento()">${esc(x.nome)}</button>`).join('')}</div>
+    ${trend}
     ${blocco}
     <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card">${graficoLinea(ore.map(h=>h+':00'),ore.map(h=>perOra[h]),{colore:t.colore})}</div>
     ${_metricaAnd==='g:demo'?'<div class="muted" style="padding:0 4px 8px">Le demo sono contate sul giorno in cui è stato preso l\'appuntamento.</div>':''}`;
