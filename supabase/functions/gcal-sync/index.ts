@@ -75,9 +75,10 @@ function addMin(data: string, ora: string, min: number) {
 }
 function addDays(data: string, n: number) { const [y, m, d] = data.split("-").map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); return t.toISOString().slice(0, 10); }
 // Parte locale (Europe/Rome) di un dateTime Google, qualunque offset abbia
+const FMT_LOCALE = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+const FMT_OFFSET = new Intl.DateTimeFormat("en-US", { timeZone: TZ, timeZoneName: "longOffset" });
 function locale(dt: string) {
-  const d = new Date(dt);
-  const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d);
+  const p = FMT_LOCALE.formatToParts(new Date(dt));
   const g = (k: string) => p.find((x) => x.type === k)?.value;
   return { data: `${g("year")}-${g("month")}-${g("day")}`, ora: `${g("hour") === "24" ? "00" : g("hour")}:${g("minute")}` };
 }
@@ -98,6 +99,8 @@ function daTitolo(summary: string) {
   const cliente = resto.replace(/[\s–-]+$/, "").trim() || null;
   return { venditore, fonte, cliente, telefono };
 }
+// Titoli che non sono appuntamenti: contengono «slot», oppure non hanno lettere, oppure hanno un contatore a cifre singole tipo 0-1-1
+const isPromemoria = (sum: string) => /\bslot\b/i.test(sum) || !/[A-Za-zÀ-ÿ]/.test(sum) || /(^|\s)\d(-\d)+(\s|$)/.test(sum);
 function tipoPerFonte(nome: string) {
   const n = (nome || "").trim().toLowerCase(); if (!n) return null;
   return _tipi.find((x) => x.gruppo === "appuntamenti" && (x.fonte || x.nome).toLowerCase() === n) ||
@@ -137,7 +140,7 @@ function eventoDa(r: any) {
 }
 function istante(x: any) { if (!x) return ""; if (x.date) return "D" + x.date; const s = String(x.dateTime); return /[+-]\d\d:\d\d$|Z$/.test(s) ? String(new Date(s).getTime()) : String(new Date(s + romaOffset(s)).getTime()); }
 // offset di Europe/Rome per un dateTime senza fuso (es. 2026-11-06T11:00:00): +01:00 o +02:00
-function romaOffset(s: string) { const d = new Date(s + "Z"); const p = new Intl.DateTimeFormat("en-US", { timeZone: TZ, timeZoneName: "longOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName")?.value || "GMT+01:00"; const m = p.match(/([+-])(\d\d):(\d\d)/); return m ? m[1] + m[2] + ":" + m[3] : "+01:00"; }
+function romaOffset(s: string) { const d = new Date(s + "Z"); const p = FMT_OFFSET.formatToParts(d).find((x) => x.type === "timeZoneName")?.value || "GMT+01:00"; const m = p.match(/([+-])(\d\d):(\d\d)/); return m ? m[1] + m[2] + ":" + m[3] : "+01:00"; }
 const uguale = (a: any, b: any) => ["summary", "location", "description"].every((k) => (a[k] || "").trim() === (b[k] || "").trim()) &&
   istante(a.start) === istante(b.start) && istante(a.end) === istante(b.end);
 
@@ -192,11 +195,7 @@ function noteDa(desc: string) {
   return m ? m[1].trim() : null;
 }
 const senzaTag = (s: any) => String(s ?? "").replace(/\s*(·\s*)?creato da Google Calendar\s*$/, "").trim();
-async function applica(ev: any) {
-  const ccId = Number(ev.extendedProperties?.private?.cc_id) || null;
-  let riga: any = null;
-  if (ccId) riga = (await sb.from("cc_registrazioni").select("*").eq("id", ccId).maybeSingle()).data;
-  if (!riga) riga = (await sb.from("cc_registrazioni").select("*").eq("google_event_id", ev.id).maybeSingle()).data;
+async function applica(ev: any, riga: any) {
   if (ev.status === "cancelled") {
     // importato (solo calendario) cancellato su Google: via anche dal portale, non era nelle statistiche
     if (riga?.solo_calendario) { await sb.from("cc_registrazioni").delete().eq("id", riga.id); return "importato cancellato #" + riga.id; }
@@ -227,8 +226,8 @@ async function applica(ev: any) {
     await sb.from("cc_registrazioni").update(agg).eq("id", riga.id);
     return "riga aggiornata #" + riga.id;
   }
-  // promemoria dell'ufficio (es. "6-7-7-7 slot Lombardia"): non è un appuntamento
-  if (/\bslot\b/i.test(sum)) return "promemoria, non un appuntamento";
+  // promemoria dell'ufficio (es. "6-7-7-7 slot Lombardia", "0-1-1", "1-0", "Emilia 0-1-1-1"): non è un appuntamento
+  if (isPromemoria(sum)) return "promemoria, non un appuntamento";
   // evento nuovo creato direttamente su Google: diventa un appuntamento preso (senza telefonista, salvo "Telefonista: Nome").
   // Se era già su Google prima del collegamento (GCAL_IMPORTATO_IL) sta solo nel calendario: nelle statistiche c'è già, dai report.
   const tf = campo(desc, "Telefonista"); const op = tf ? _ops.find((o) => o.nome.toLowerCase().startsWith(tf.toLowerCase().split(" ")[0])) : null;
@@ -240,24 +239,52 @@ async function applica(ev: any) {
   if (error) throw error;
   return (soloCal ? "importato nel calendario #" : "riga creata #") + data.id;
 }
+const BUDGET_MS = 20000;   // lavoro per ogni giro del cron: poi salvo il segnalibro di pagina e riprendo al giro dopo
 async function pull() {
-  const st = (await sb.from("cc_sync_state").select("v").eq("k", "syncToken").maybeSingle()).data?.v;
-  const esiti: string[] = [];
-  let pageToken: string | undefined, syncToken = st;
-  for (let giro = 0; giro < 20; giro++) {
-    const q = new URLSearchParams({ maxResults: "250", showDeleted: "true", singleEvents: "true" });
-    if (pageToken) q.set("pageToken", pageToken);
-    else if (syncToken) q.set("syncToken", syncToken);
-    else { const da = /^\d{4}-\d\d-\d\d$/.test(IMPORTA_DA) ? IMPORTA_DA + "T00:00:00Z" : new Date(Date.now() - 60 * 86400000).toISOString(); q.set("timeMin", da); }
-    let res: any;
-    try { res = await gapi("/events?" + q.toString()); }
-    catch (e: any) { if (e.status === 410 && syncToken) { syncToken = undefined; pageToken = undefined; continue; } throw e; }
-    for (const ev of res.items || []) { try { esiti.push(await applica(ev)); } catch (e: any) { esiti.push("errore " + ev.id + ": " + e.message); } }
-    if (res.nextPageToken) { pageToken = res.nextPageToken; continue; }
-    if (res.nextSyncToken) await sb.from("cc_sync_state").upsert({ k: "syncToken", v: res.nextSyncToken });
-    break;
-  }
-  return esiti;
+  const righe = (await sb.from("cc_sync_state").select("k,v").in("k", ["syncToken", "pullPageToken", "pullLock", "pullFinestra"])).data || [];
+  const stato: Record<string, string> = Object.fromEntries(righe.map((r: any) => [r.k, r.v]));
+  if (stato.pullLock && Date.now() - Number(stato.pullLock) < 55000) return ["pull già in corso"];
+  await sb.from("cc_sync_state").upsert({ k: "pullLock", v: String(Date.now()) });
+  const esiti: string[] = [], t0 = Date.now();
+  let pageToken: string | undefined = stato.pullPageToken || undefined, syncToken: string | undefined = pageToken ? undefined : stato.syncToken;
+  // Finestra della lettura completa: da GCAL_IMPORTA_DA a un anno avanti (senza timeMax Google espande i ricorrenti fino al 2040).
+  // Va ripetuta IDENTICA a ogni pagina (col solo pageToken Google ignora i filtri), quindi la salvo insieme al segnalibro di pagina.
+  let finestra: { timeMin: string; timeMax: string } | null = pageToken && stato.pullFinestra ? JSON.parse(stato.pullFinestra) : null;
+  const nuovaFinestra = () => ({ timeMin: /^\d{4}-\d\d-\d\d$/.test(IMPORTA_DA) ? IMPORTA_DA + "T00:00:00Z" : new Date(Date.now() - 60 * 86400000).toISOString(), timeMax: new Date(Date.now() + 366 * 86400000).toISOString() });
+  try {
+    for (let giro = 0; giro < 50; giro++) {
+      const q = new URLSearchParams({ maxResults: "100", showDeleted: "true", singleEvents: "true" });
+      if (syncToken) q.set("syncToken", syncToken);
+      else { if (!finestra) finestra = nuovaFinestra(); q.set("timeMin", finestra.timeMin); q.set("timeMax", finestra.timeMax); }
+      if (pageToken) q.set("pageToken", pageToken);
+      let res: any;
+      try { res = await gapi("/events?" + q.toString()); }
+      catch (e: any) {
+        if (e.status === 410 && syncToken) { syncToken = undefined; pageToken = undefined; continue; }            // segnalibro scaduto: lettura completa
+        if ((e.status === 400 || e.status === 410) && pageToken) { await sb.from("cc_sync_state").delete().in("k", ["pullPageToken", "pullFinestra"]); pageToken = undefined; syncToken = undefined; finestra = null; continue; }
+        throw e;
+      }
+      const items: any[] = res.items || [];
+      // righe già collegate a questi eventi: una query per pagina
+      const gids = items.map((ev) => ev.id), ccIds = items.map((ev) => Number(ev.extendedProperties?.private?.cc_id)).filter(Boolean);
+      const perGid = new Map<string, any>(), perCc = new Map<number, any>();
+      if (gids.length) ((await sb.from("cc_registrazioni").select("*").in("google_event_id", gids)).data || []).forEach((r: any) => perGid.set(r.google_event_id, r));
+      if (ccIds.length) ((await sb.from("cc_registrazioni").select("*").in("id", ccIds)).data || []).forEach((r: any) => perCc.set(r.id, r));
+      for (const ev of items) {
+        const riga = perCc.get(Number(ev.extendedProperties?.private?.cc_id)) || perGid.get(ev.id) || null;
+        try { esiti.push(await applica(ev, riga)); } catch (e: any) { esiti.push("errore " + ev.id + ": " + e.message); }
+      }
+      if (res.nextPageToken) {
+        pageToken = res.nextPageToken;
+        if (Date.now() - t0 > BUDGET_MS) { await sb.from("cc_sync_state").upsert([{ k: "pullPageToken", v: pageToken }, { k: "pullFinestra", v: JSON.stringify(finestra) }]); esiti.push("continuo al prossimo giro"); return esiti; }
+        continue;
+      }
+      if (res.nextSyncToken) await sb.from("cc_sync_state").upsert({ k: "syncToken", v: res.nextSyncToken });
+      await sb.from("cc_sync_state").delete().in("k", ["pullPageToken", "pullFinestra"]);
+      break;
+    }
+    return esiti;
+  } finally { await sb.from("cc_sync_state").delete().eq("k", "pullLock"); }
 }
 
 Deno.serve(async (req) => {
