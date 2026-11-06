@@ -88,9 +88,12 @@ function locale(dt: string) {
 // ── titoli come li scrive l'ufficio su Google: "(Venditore) ST - Nome Cognome 3331234567", "TO riconf.CC - Nome", "INT - Nome" ──
 const SIGLE: Record<string, string> = { ST: "Stand", INT: "Internet", CC: "CC", RF: "Referenze" };
 const siglaDi = (fonte: string) => Object.keys(SIGLE).find((k) => SIGLE[k].toLowerCase() === (fonte || "").toLowerCase()) || "";
+const pareVenditore = (v: string) => { const t = v.trim(); return !!t && !/[\d,.]/.test(t) && /^[A-ZÀ-Ý]/.test(t) && t.split(/\s+/).length <= 5; };
 function daTitolo(summary: string) {
   let s = (summary || "").trim(), venditore: string | null = null;
-  const mv = s.match(/^\(([^)]+)\)\s*/); if (mv) { venditore = mv[1].trim(); s = s.slice(mv[0].length); }
+  // «(Nome Cognome)» o «(Stefano Banfi + Carlo)» all'inizio = consulente; una frase tra parentesi (cifre, virgole, punti, minuscola iniziale, più di 5 parole) è una nota dell'ufficio e resta nel nome
+  const mv = s.match(/^\(([^)]+)\)\s*/);
+  if (mv && pareVenditore(mv[1])) { venditore = mv[1].trim(); s = s.slice(mv[0].length); }
   const mf = s.match(/(^|[^A-Za-z])(ST|INT|CC|RF)(?![A-Za-z])/i);           // sigla della fonte, dove sia nel titolo
   const fonte = mf ? SIGLE[mf[2].toUpperCase()] : null;
   let resto = s, prefisso = "";

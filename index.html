@@ -192,7 +192,8 @@
     .cal-gutter { font-size:10px; color:var(--text3); position:relative; }
     .cal-col { position:relative; border-left:0.5px solid var(--sep); cursor:pointer; background-image:linear-gradient(to bottom, rgba(0,0,0,0.07) 0.5px, transparent 0.5px); background-size:100% 44px; }
     .cal-block { position:absolute; left:2px; right:2px; border-radius:6px; padding:3px 6px; font-size:11px; line-height:1.25; overflow:hidden; border-left:3px solid; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.10); color:var(--text); }
-    .cal-block b { display:block; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-block b { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; font-size:12px; line-height:1.2; overflow:hidden; }
+    .cal-block .cal-sub { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .cal-now { position:absolute; left:0; right:0; height:2px; background:var(--red-sys); z-index:2; pointer-events:none; }
     .cal-now::before { content:''; position:absolute; left:-4px; top:-3px; width:8px; height:8px; border-radius:50%; background:var(--red-sys); }
     @media(max-width:700px){ .cal-cell { min-height:64px; padding:2px; } .cal-ev { font-size:9px; padding:1px 3px; } .cal-title { font-size:15px; } }
@@ -291,7 +292,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.9 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.0 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -869,7 +870,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v3.9')}
+      ${riga('ti-info-circle','gray','Versione','v4.0')}
     </div>`;
 }
 
@@ -1246,6 +1247,10 @@ let _calVista=window.matchMedia('(max-width:700px)').matches?'giorno':'sett',_ca
 const CAL_H0=8,CAL_H1=24,CAL_HH=44;   // griglia dalle 8 a mezzanotte (etichette fino alle 23:00: gli appuntamenti delle 21 finiscono alle 23) e altezza di un'ora in px
 function lunediDi(iso){return isoAddDays(iso,-((isoToDate(iso).getDay()+6)%7));}
 function hm(t){return t?String(t).slice(0,5):'';}
+// Titolo dell'appuntamento come su Google Calendar (Davide 06/11: «prima il consulente, poi il cliente»): (Consulente) TO ST - Cliente
+const SIGLE_FONTE={Stand:'ST',Internet:'INT',CC:'CC',Referenze:'RF'};
+function titoloEv(e){const t=tipoDi(e.tipo_codice),sig=SIGLE_FONTE[t.fonte]||'';return [e.venditore?'('+e.venditore+')':'',e.zona==='P'?'TO':e.zona==='E'?'BO':'',sig?sig+' -':'',e.cliente||'Cliente n.i.'].filter(Boolean).join(' ');}
+function fineEv(e){if(!e.ora_appuntamento)return '';const m=minuti(e.ora_appuntamento)+(e.durata_min||120);return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
 function minuti(t){if(!t)return null;const[h,m]=String(t).split(':').map(Number);return h*60+m;}
 function calRange(){
   if(_calVista==='mese'){const p=_calData.split('-').map(Number),first=`${p[0]}-${String(p[1]).padStart(2,'0')}-01`,start=lunediDi(first);return{start,end:isoAddDays(start,41)};}
@@ -1289,7 +1294,7 @@ async function renderCalendario(target,editable){
   const listaSenza=_calEdit&&senza.length?`<div class="section-title">Appuntamenti ancora senza data nel calendario · presi negli ultimi 30 giorni (${senza.length})</div><div class="card card-flush">${senza.slice(0,30).map(e=>{const t=tipoDi(e.tipo_codice);return `<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-question"></i></div><div class="row-body"><div class="row-title"><b>${esc(e.cliente||'Cliente non indicato')}</b> · ${esc(opDi(e.operatrice_id).nome)} · ${esc(t.fonte||t.nome)}</div><div class="row-sub">preso ${labelGiorno(e.data)} ${hhmm(e.ora)}${e.telefono?' · '+esc(e.telefono):''}</div></div><button class="btn btn-sm btn-primary" onclick="apriEvento(${e.id},'${oggiIso()}')"><i class="ti ti-calendar-plus"></i> Metti in calendario</button></div>`;}).join('')}${senza.length>30?`<div class="muted" style="padding:8px 14px">e altri ${senza.length-30}…</div>`:''}</div>`:'';
   el.innerHTML=head+body+listaSenza;
 }
-function chipEv(e){const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue;return `<div class="cal-ev bg-${t.colore}" style="border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</div>`;}
+function chipEv(e){const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue;return `<div class="cal-ev bg-${t.colore}" style="border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</div>`;}
 // Appuntamenti che si sovrappongono nello stesso giorno: affiancati in colonne, come in Google Calendar
 function layoutEv(lista){
   const evs=lista.map(e=>({e,s:minuti(e.ora_appuntamento),f:minuti(e.ora_appuntamento)+Math.max(30,e.durata_min||120)})).sort((a,b)=>a.s-b.s||a.f-b.f);
@@ -1298,7 +1303,7 @@ function layoutEv(lista){
   evs.forEach(x=>{if(x.s>=fine)chiudi();fine=Math.max(fine,x.f);cluster.push(x);});chiudi();
   return out;
 }
-function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||120)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([o.senza?'':o.nome.split(' ')[0],e.zona?ZONE[e.zona]:'',e.venditore?'→ '+e.venditore:'',e.indirizzo].filter(Boolean).join(' · '))}</div>`;}
+function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||120)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b><span class="cal-sub">${esc([hm(e.ora_appuntamento)+(fineEv(e)?'–'+fineEv(e):''),o.senza?'':o.nome.split(' ')[0],e.telefono].filter(Boolean).join(' · '))}</span>${e.indirizzo?`<span class="cal-sub">${esc(e.indirizzo)}</span>`:''}</div>`;}
 function calClickGiorno(ev,g){if(_calVista==='mese'&&(!_calEdit||window.matchMedia('(max-width:700px)').matches)){_calData=g;calVista('giorno');return;}if(!_calEdit)return;apriEvento(null,g);}
 function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarget.getBoundingClientRect().top;const h=CAL_H0+Math.floor(y/CAL_HH),m=Math.floor((y%CAL_HH)/(CAL_HH/2))*30;apriEvento(null,g,`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 // Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
