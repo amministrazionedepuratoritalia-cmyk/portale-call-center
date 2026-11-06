@@ -293,7 +293,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.2 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.3 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -871,7 +871,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.2')}
+      ${riga('ti-info-circle','gray','Versione','v4.3')}
     </div>`;
 }
 
@@ -940,7 +940,9 @@ let _metricaAnd=null;
 const COLORE_HEX={blue:'#0071E3',green:'#1D8348',amber:'#B25000',red:'#CC1B1B',pink:'#C0185A',purple:'#7B2FBE',indigo:'#5E5CE6',gray:'#636366'};
 // Colori degli eventi di Google Calendar (colorId 1–11): nel calendario l'appuntamento ha il colore che ha su Google, altrimenti quello della fonte
 const COLORI_GOOGLE={1:'#7986CB',2:'#33B679',3:'#8E24AA',4:'#E67C73',5:'#F6BF26',6:'#F4511E',7:'#039BE5',8:'#616161',9:'#3F51B5',10:'#0B8043',11:'#D50000'};
-function stileEv(e){const c=COLORI_GOOGLE[e.google_colore];return c?`background:${c};color:${testoSu(c)};border-left-color:rgba(0,0,0,.28)`:'background:#fff;color:#1d1d1f;border:0.5px solid rgba(0,0,0,.18);border-left:3px solid #8E8E93';}
+// Senza colore proprio, su Google l'evento prende il colore del calendario «Depuratori Vendite»: rosso Pomodoro (visto il 06/11 nell'account amministrazione)
+const COLORE_CALENDARIO='#D50000';
+function stileEv(e){const c=COLORI_GOOGLE[e.google_colore]||COLORE_CALENDARIO;return `background:${c};color:${testoSu(c)};border-left-color:rgba(0,0,0,.28)`;}
 function testoSu(hex){const n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#1d1d1f':'#fff';}
 function graficoLinea(etichette,valori,opt={}){
   const n=valori.length;if(!n)return'<div class="empty">Niente da mostrare.</div>';
