@@ -74,6 +74,15 @@
     .tot .casella.piena { color:#fff; }
     .vuoto { color:var(--text3); font-size:14px; padding:20px; text-align:center; }
     @media(max-width:1100px){ .tv { grid-template-columns:1fr; grid-template-rows:64px 1fr 1fr; } }
+    /* telefono: barra in alto compatta, legenda a capo */
+    @media(max-width:680px){
+      .tv { grid-template-rows:auto 1fr; padding:0 8px 10px; }
+      .top { height:auto; padding:8px 2px; gap:10px; flex-wrap:wrap; }
+      .top .logo { height:26px; } .top h1 { font-size:18px; } .top .sett { font-size:13px; width:100%; order:3; } .top .ora { font-size:20px; } .top .agg { display:none; }
+      .pannello { padding:8px; border-radius:12px; }
+      .pannello h2 { flex-wrap:wrap; font-size:13px; }
+      .legenda { margin-left:0; width:100%; flex-wrap:wrap; gap:6px 10px; font-size:11px; }
+    }
     /* adattiva: se la lavagna non ci sta nello schermo (portatile, tablet, dentro al portale) la pagina scorre invece di tagliare */
     body.scorri { overflow:auto; }
     body.scorri .tv { height:auto; min-height:100vh; }
