@@ -180,6 +180,14 @@ async function push(tipo: string, record: any, old: any) {
   }
   // eventi nuovi solo per gli appuntamenti registrati da GCAL_SCRIVI_DA in poi: niente creazioni a ritroso per righe vecchie che vengono ritoccate
   if (SCRIVI_DA && String(record.data || "") < SCRIVI_DA) return "registrato prima di " + SCRIVI_DA + ": non lo creo su Google";
+  // l'ufficio l'ha già scritto a mano su Google (riga arrivata dal pull, stesso giorno e stesso cliente/telefono)? mi collego a quello invece di crearne un doppio
+  const gemello = await gemelloGoogle(record);
+  if (gemello) {
+    const u = unione(record, { data_appuntamento: gemello.data_appuntamento, ora_appuntamento: gemello.ora_appuntamento, durata_min: gemello.durata_min, indirizzo: gemello.indirizzo, zona: gemello.zona, venditore: gemello.venditore, cliente: gemello.cliente, telefono: gemello.telefono, note: gemello.note, google_event_id: gemello.google_event_id, google_sync_at: new Date().toISOString() });
+    await sb.from("cc_registrazioni").update(u).eq("id", record.id);
+    await sb.from("cc_registrazioni").delete().eq("id", gemello.id);   // la riga doppia arrivata da Google: resta quella della telefonista
+    return "collegato all'evento già scritto su Google (riga doppia #" + gemello.id + " unita)";
+  }
   const creato = await gapi("/events", "POST", voluto);
   await sb.from("cc_registrazioni").update({ google_event_id: creato.id, google_sync_at: new Date().toISOString() }).eq("id", record.id);
   return "evento creato " + creato.id;
@@ -206,6 +214,36 @@ function noteDa(desc: string) {
   return m ? m[1].trim() : null;
 }
 const senzaTag = (s: any) => String(s ?? "").replace(/\s*(·\s*)?creato da Google Calendar\s*$/, "").trim();
+
+// ── Doppioni: lo stesso appuntamento scritto sia nel portale (telefonista) sia a mano su Google (ufficio) ──
+// Stesso giorno + stesso telefono (solo cifre, senza +39) oppure stesso nome (parole in qualsiasi ordine, senza accenti)
+const telNorm = (t: any) => { let d = String(t ?? "").replace(/\D/g, ""); if (d.startsWith("0039")) d = d.slice(4); else if (d.startsWith("39") && d.length > 10) d = d.slice(2); return d; };
+const nomeNorm = (c: any) => String(c ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean).sort().join(" ");
+const stessoCliente = (a: any, b: any) => { const ta = telNorm(a.telefono), tb = telNorm(b.telefono); if (ta && ta === tb) return true; const na = nomeNorm(a.cliente), nb = nomeNorm(b.cliente); return !!na && na === nb; };
+// La riga del portale resta quella «vera» (telefonista, fonte, cliente e telefono come li ha scritti lei): da Google prendo giorno/ora e quello che le manca
+function unione(riga: any, agg: any) {
+  const u: any = { ...agg, origine: "google" };
+  for (const k of ["cliente", "telefono", "operatrice_id", "venditore", "indirizzo", "zona"]) if (k in u && riga[k] != null && riga[k] !== "") u[k] = riga[k];
+  u.note = riga.note || agg.note || null;
+  if (agg.note && riga.note && senzaTag(agg.note) !== senzaTag(riga.note)) u.note = senzaTag(riga.note) + " · " + senzaTag(agg.note);
+  return u;
+}
+// Riga arrivata da Google (scritta a mano dall'ufficio) che è lo stesso appuntamento di questa riga del portale
+async function gemelloGoogle(r: any) {
+  if (!r.data_appuntamento) return null;
+  const cand = (await sb.from("cc_registrazioni").select("*").eq("origine", "google").eq("data_appuntamento", r.data_appuntamento).like("tipo_codice", "app_%").not("google_event_id", "is", null).neq("id", r.id)).data || [];
+  return cand.find((c: any) => stessoCliente(r, c)) || null;
+}
+// Cancella un evento su Google SOLO se l'abbiamo creato noi (creatore = service account, o nostra firma): quelli dell'ufficio non si toccano mai
+async function eliminaNostro(gid: string) {
+  let ev: any = null;
+  try { ev = await gapi("/events/" + gid); } catch (e: any) { if (e.status === 404 || e.status === 410) return false; throw e; }
+  if (!ev || ev.status === "cancelled") return false;
+  const nostro = (SA.client_email && ev.creator?.email === SA.client_email) || !!ev.extendedProperties?.private?.cc_id;
+  if (!nostro) return false;
+  await gapi("/events/" + gid, "DELETE");
+  return true;
+}
 // La telefonista è scritta nelle note dell'evento come «Cognome I.» (Mesiano E., Molina I., Monti G, Carletti D.) o nome e cognome per esteso.
 // Serve cognome + iniziale (o il nome completo): il solo nome di battesimo non basta, nelle note c'è anche il nome della promoter.
 const esc_ = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -225,6 +263,16 @@ async function applica(ev: any, riga: any) {
   if (ev.status === "cancelled") {
     // importato (solo calendario) cancellato su Google: via anche dal portale, non era nelle statistiche
     if (riga?.solo_calendario) { await sb.from("cc_registrazioni").delete().eq("id", riga.id); return "importato cancellato #" + riga.id; }
+    // l'ufficio ha cancellato un evento creato dal portale perché lo aveva già scritto a mano? la riga si collega a quello, non perde la data
+    if (riga && riga.data_appuntamento && riga.origine === "portale") {
+      const g = await gemelloGoogle(riga);
+      if (g) {
+        const u = unione(riga, { data_appuntamento: g.data_appuntamento, ora_appuntamento: g.ora_appuntamento, durata_min: g.durata_min, indirizzo: g.indirizzo, zona: g.zona, venditore: g.venditore, cliente: g.cliente, telefono: g.telefono, note: g.note, google_event_id: g.google_event_id, google_sync_at: new Date().toISOString() });
+        await sb.from("cc_registrazioni").update(u).eq("id", riga.id);
+        await sb.from("cc_registrazioni").delete().eq("id", g.id);
+        return "doppione tolto dall'ufficio: riga #" + riga.id + " collegata all'evento scritto a mano (riga doppia #" + g.id + " unita)";
+      }
+    }
     // cancellato su Google: lo tolgo dal calendario del portale ma l'appuntamento preso resta nelle statistiche
     if (riga && riga.data_appuntamento) await sb.from("cc_registrazioni").update({ data_appuntamento: null, ora_appuntamento: null, google_event_id: null, google_sync_at: new Date().toISOString(), note: [riga.note, "tolto dal calendario Google"].filter(Boolean).join(" · ") }).eq("id", riga.id);
     return riga ? "tolto dal calendario" : "ignorato";
@@ -263,10 +311,14 @@ async function applica(ev: any, riga: any) {
   const creato = ev.created ? locale(ev.created) : { data: new Date().toISOString().slice(0, 10) };
   // stesso appuntamento già registrato nel portale (stessa data e stesso telefono o stesso cliente)? lo collego invece di crearne un altro
   if (agg.data_appuntamento) {
-    const cand = (await sb.from("cc_registrazioni").select("*").eq("origine", "portale").is("google_event_id", null).eq("data_appuntamento", agg.data_appuntamento).like("tipo_codice", "app_%")).data || [];
-    const norm = (x: any) => String(x ?? "").toLowerCase().replace(/[^a-z0-9à-ÿ]/g, "");
-    const stesso = cand.find((c: any) => (agg.telefono && norm(c.telefono) === norm(agg.telefono)) || (cliente && norm(c.cliente) && norm(c.cliente) === norm(cliente)));
-    if (stesso) { await sb.from("cc_registrazioni").update({ ...agg, origine: "google", note: stesso.note || agg.note || null }).eq("id", stesso.id); return "collegato all'appuntamento del portale #" + stesso.id; }
+    const cand = (await sb.from("cc_registrazioni").select("*").eq("origine", "portale").eq("data_appuntamento", agg.data_appuntamento).like("tipo_codice", "app_%")).data || [];
+    const stesso = cand.find((c: any) => stessoCliente({ telefono: tel, cliente }, c));
+    if (stesso) {
+      // per quella riga avevamo già creato noi un evento? lo tolgo: vince quello scritto dall'ufficio
+      let tolto = false; if (stesso.google_event_id && stesso.google_event_id !== ev.id) tolto = await eliminaNostro(stesso.google_event_id);
+      await sb.from("cc_registrazioni").update(unione(stesso, agg)).eq("id", stesso.id);
+      return "collegato all'appuntamento del portale #" + stesso.id + (tolto ? " (tolto il nostro doppione su Google)" : "");
+    }
   }
   const soloCal = !!IMPORTATO_IL && !!ev.created && new Date(ev.created).getTime() < new Date(IMPORTATO_IL).getTime();
   const ins = { ...agg, origine: "google", tipo_codice: fonteDa(ev), operatrice_id: op?.id || null, data: creato.data, ora: ev.created || new Date().toISOString(), solo_calendario: soloCal,
@@ -363,6 +415,17 @@ Deno.serve(async (req) => {
         if (!res.nextPageToken) break; pageToken = res.nextPageToken;
       }
       return Response.json({ ok: true, ripristinati: fatti.length, fatti, errori });
+    }
+    if (url.searchParams.get("mode") === "unisci") {      // una tantum: stesso appuntamento nel portale (riga P) e scritto a mano su Google (riga G dal pull): resta P, collegata all'evento dell'ufficio; il nostro doppione su Google viene tolto
+      const pid = Number(url.searchParams.get("portale")), gid = Number(url.searchParams.get("google"));
+      const P = (await sb.from("cc_registrazioni").select("*").eq("id", pid).single()).data, G = (await sb.from("cc_registrazioni").select("*").eq("id", gid).eq("origine", "google").single()).data;
+      if (!P || !G || !G.google_event_id) return Response.json({ ok: false, errore: "righe non trovate" }, { status: 400 });
+      if (!stessoCliente(P, G)) return Response.json({ ok: false, errore: "non sembrano lo stesso cliente" }, { status: 400 });
+      let tolto = false; if (P.google_event_id && P.google_event_id !== G.google_event_id) tolto = await eliminaNostro(P.google_event_id);
+      const u = unione(P, { data_appuntamento: G.data_appuntamento, ora_appuntamento: G.ora_appuntamento, durata_min: G.durata_min, indirizzo: G.indirizzo, zona: G.zona, venditore: G.venditore, cliente: G.cliente, telefono: G.telefono, note: G.note, google_event_id: G.google_event_id, google_sync_at: new Date().toISOString() });
+      await sb.from("cc_registrazioni").update(u).eq("id", pid);
+      await sb.from("cc_registrazioni").delete().eq("id", gid);
+      return Response.json({ ok: true, portale: pid, riga_google_unita: gid, evento_ufficio: G.google_event_id, nostro_evento_tolto: tolto });
     }
     if (url.searchParams.get("mode") === "elimina") {     // una tantum: cancella un evento creato dal portale (solo se il creatore è il service account)
       const gid = url.searchParams.get("gid") || "";
