@@ -140,7 +140,7 @@ async function carica(){
 // fonti mostrate: quelle attive, più «Non indicata» solo se in settimana c'è qualche appuntamento senza fonte (arrivato da Google)
 function fontiMostrate(){return [...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&(t.attivo||evs.some(e=>e.tipo_codice===t.codice)||pren.some(e=>e.tipo_codice===t.codice))).map(t=>t.fonte||t.nome))];}
 function legenda(){const f=fontiMostrate();return f.map(x=>{const t=tipi.find(y=>(y.fonte||y.nome)===x);return `<span><i style="background:${COLORE_HEX[t.colore]||'#000'}"></i>${esc(x)}</span>`;}).join('')+'<span>✓ demo fatta</span>';}
-function legendaLav(){return legenda()+`<span><i style="background:${NERO}"></i>preso per il giorno dopo</span><span><i style="background:${ROSSO}"></i>settimana successiva</span><span>P. Piemonte · E. Emilia-Romagna</span>`;}
+function legendaLav(){return legenda()+`<span><i style="background:${NERO}"></i>in fondo: stessa settimana</span><span><i style="background:${ROSSO}"></i>in fondo: settimana successiva</span><span>P. Piemonte · E. Emilia-Romagna</span>`;}
 function disegna(){
   document.getElementById('sett').textContent='Settimana '+titoloSett();
   const l1=document.getElementById('leg1');if(l1)l1.innerHTML=legenda();const l2=document.getElementById('leg2');if(l2)l2.innerHTML=legendaLav();
@@ -169,11 +169,12 @@ function disegnaCalendario(){
 // ── lavagna ──
 // Nei giorni: gli appuntamenti FISSATI quel giorno, nella fascia della loro ora (senza ora: prima fascia), casella piena col colore della fonte;
 // P. ed E. = Piemonte ed Emilia-Romagna, il resto è Lombardia. In fondo: gli appuntamenti PRESI nella settimana (lun–dom) per fonte,
-// 20 caselle (Stand 40, l'admin può cambiarle): nero = preso per il giorno dopo, rosso = va a una settimana successiva, altrimenti colore della fonte.
+// 20 caselle (Stand 40, l'admin può cambiarle): vuote, poi nero = appuntamento nella stessa settimana (giorno dopo o seguenti), rosso = settimana successiva.
 const NERO='#111111',ROSSO='#CC1B1B';
 function fasciaDi(e){const m=minuti(e.ora_appuntamento);if(m==null)return 0;const i=FASCE.findIndex(f=>m>=f.da&&m<f.a);return i<0?0:i;}
 function coloreFonte(e){return COLORE_HEX[tipoDi(e.tipo_codice).colore]||'#636366';}
-function colorePreso(e){if(!e.data_appuntamento||!e.data)return coloreFonte(e);if(e.data_appuntamento===isoAddDays(e.data,1))return NERO;if(lunediDi(e.data_appuntamento)>lunediDi(e.data))return ROSSO;return coloreFonte(e);}
+// in fondo: casella vuota finché non c'è l'appuntamento; poi NERO se l'appuntamento è nella stessa settimana in cui è stato preso (il giorno dopo o i giorni seguenti), ROSSO se va a una settimana successiva
+function colorePreso(e){if(e.data_appuntamento&&e.data&&lunediDi(e.data_appuntamento)>lunediDi(e.data))return ROSSO;return NERO;}
 const ggmm=iso=>iso?iso.split('-').reverse().slice(0,2).join('/'):'';
 function box(e,colore,cls){const t=tipoDi(e.tipo_codice);return `<div class="${cls||'casella'} piena${e.demo==='fatta'?' fatta':''}" style="background:${colore};border-color:${colore}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.zona?' · '+ZONE[e.zona]:'')+(e.data_appuntamento?' · '+ggmm(e.data_appuntamento):'')+(e.ora_appuntamento?' '+hm(e.ora_appuntamento):''))}">${e.demo==='fatta'?'✓':''}</div>`;}
 function vuote(n,cls){return n>0?Array(n).fill(`<div class="${cls||'casella'}"></div>`).join(''):'';}
