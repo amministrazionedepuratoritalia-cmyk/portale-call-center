@@ -236,8 +236,9 @@ function disegnaLavagna(){
   const maxCella=Math.max(CASELLE_FASCIA,...giorni.flatMap(g=>FASCE.map((f,i)=>(perG[g]||[]).filter(e=>fasciaDi(e)===i&&!e.zona).length)));
   const cols=Math.max(4,Math.ceil(maxCella/3)),cellaW=(el.clientWidth-72)/6-14;
   el.style.setProperty('--box',Math.max(12,Math.min(30,Math.floor((cellaW-(cols-1)*4)/cols)))+'px');
-  const gruppoW=el.clientWidth/4-14,maxFondo=Math.max(20,...gruppiFondo().map(x=>x.n)),perRiga=maxFondo>=40?20:10;
-  el.style.setProperty('--tbox',Math.max(10,Math.min(22,Math.floor((gruppoW-(perRiga-1)*3)/perRiga)))+'px');
+  // in fondo 10 caselle per riga come sulla lavagna vera (20 = 2 righe, 40 = 4 righe), misura dallo spazio del gruppo
+  const gruppoW=el.clientWidth/4-14;
+  el.style.setProperty('--tbox',Math.max(10,Math.min(24,Math.floor((gruppoW-27)/10)))+'px');
   let h=`<div></div>${giorni.map(g=>{const d=isoToDate(g);return `<div class="giorno${g===oggiIso()?' today':''}">${GIORNI[d.getDay()]}<small>${d.getDate()}|${d.getMonth()+1}</small></div>`;}).join('')}`;
   FASCE.forEach((f,i)=>{
     h+=`<div class="fascia">${f.lbl.split('\n').map(x=>`<span>${x}</span>`).join('')}</div>`;
