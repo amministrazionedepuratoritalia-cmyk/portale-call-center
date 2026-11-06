@@ -197,6 +197,16 @@
     .cal-block.solido, .cal-ev.solido { box-shadow:0 1px 2px rgba(0,0,0,.18); }
     .cal-now { position:absolute; left:0; right:0; height:2px; background:var(--red-sys); z-index:2; pointer-events:none; }
     .cal-now::before { content:''; position:absolute; left:-4px; top:-3px; width:8px; height:8px; border-radius:50%; background:var(--red-sys); }
+    /* Settimana (Davide 06/11: «troppo schiacciato, gli appuntamenti si sovrappongono»): pagina a tutta larghezza, colonne da almeno 200 px (su uno schermo largo si allargano),
+       appuntamenti in elenco uno sotto l'altro (niente sovrapposizioni); se non ci stanno, la settimana scorre in orizzontale */
+    .page-content.largo { max-width:none; }
+    .cal-week-list { display:grid; grid-template-columns:repeat(var(--cols,7),minmax(200px,1fr)); background:var(--surface); border-radius:13px; box-shadow:var(--sh-xs); overflow:hidden; }
+    .cal-daylist { border-left:0.5px solid var(--sep); padding:4px 4px 10px; min-height:200px; cursor:pointer; }
+    .cal-daylist.today { background:var(--blue-bg); }
+    .cal-fascia { font-size:10px; font-weight:700; color:var(--text3); letter-spacing:.3px; padding:7px 3px 3px; }
+    .cal-item { border-radius:7px; padding:5px 7px; margin:0 0 4px; font-size:11.5px; line-height:1.25; cursor:pointer; border-left:3px solid; box-shadow:0 1px 2px rgba(0,0,0,.18); }
+    .cal-item b { display:block; font-size:12.5px; line-height:1.2; }
+    .cal-item .cal-sub { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.92; }
     @media(max-width:700px){ .cal-cell { min-height:64px; padding:2px; } .cal-ev { font-size:9px; padding:1px 3px; } .cal-title { font-size:15px; } }
     .fonte-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:14px; }
     .fonte-card { background:var(--surface); border-radius:16px; box-shadow:var(--sh-xs); padding:12px 14px 6px; }
@@ -293,7 +303,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.3 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.4 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -533,6 +543,7 @@ function switchTab(el,id){
   const screen=el.closest('.screen');
   screen.querySelectorAll('.nav-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
   screen.querySelectorAll('.page-content > div').forEach(d=>d.classList.toggle('hidden',d.id!==id));
+  screen.querySelector('.page-content').classList.toggle('largo',id==='tab-calendario'||id==='op-tab-cal');
 }
 
 // Tabelle compatte: una colonna per fonte, in ogni casella «contatti / appuntamenti»; le attività senza fonte restano una colonna ciascuna
@@ -871,7 +882,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.3')}
+      ${riga('ti-info-circle','gray','Versione','v4.4')}
     </div>`;
 }
 
@@ -1288,6 +1299,11 @@ async function renderCalendario(target,editable){
   if(_calVista==='mese'){
     const mese=_calData.slice(0,7);
     body=`<div class="cal-month">${['lun','mar','mer','gio','ven','sab','dom'].map(d=>`<div class="cal-dow">${d}</div>`).join('')}${giorni.map(g=>{const lista=perG[g]||[];return `<div class="cal-cell${g.slice(0,7)!==mese?' other':''}${g===oggiIso()?' today':''}" onclick="calClickGiorno(event,'${g}')"><div class="cal-num">${isoToDate(g).getDate()}</div>${lista.slice(0,3).map(chipEv).join('')}${lista.length>3?`<div class="cal-more" onclick="event.stopPropagation();_calData='${g}';calVista('giorno')">+${lista.length-3} altri</div>`:''}</div>`;}).join('')}</div>`;
+  }else if(_calVista==='sett'){
+    body=`<div class="table-wrap"><div class="cal-week-list" style="--cols:${giorni.length}">
+      ${giorni.map(g=>`<div class="cal-wh${g===oggiIso()?' today':''}" style="border-left:none"><div class="d">${GIORNI_BREVI[isoToDate(g).getDay()]}</div><div class="n">${isoToDate(g).getDate()}</div></div>`).join('')}
+      ${giorni.map(g=>{const lista=(perG[g]||[]).slice().sort((a,b)=>String(a.ora_appuntamento||'').localeCompare(String(b.ora_appuntamento||'')));let ultima=null;return `<div class="cal-daylist${g===oggiIso()?' today':''}" onclick="calClickGiorno(event,'${g}')">${lista.map(e=>{const k=e.ora_appuntamento?hm(e.ora_appuntamento):'senza ora';const testa=k!==ultima?`<div class="cal-fascia">${k}</div>`:'';ultima=k;return testa+itemEv(e);}).join('')||'<div class="muted" style="padding:8px 4px;font-size:11px">Nessun appuntamento</div>'}</div>`;}).join('')}
+    </div></div>`;
   }else{
     const n=giorni.length,H=(CAL_H1-CAL_H0)*CAL_HH,ore=[];for(let h=CAL_H0;h<CAL_H1;h++)ore.push(h);
     const adesso=new Date(),minOra=adesso.getHours()*60+adesso.getMinutes();
@@ -1301,6 +1317,8 @@ async function renderCalendario(target,editable){
   const listaSenza=_calEdit&&senza.length?`<div class="section-title">Appuntamenti ancora senza data nel calendario · presi negli ultimi 30 giorni (${senza.length})</div><div class="card card-flush">${senza.slice(0,30).map(e=>{const t=tipoDi(e.tipo_codice);return `<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-question"></i></div><div class="row-body"><div class="row-title"><b>${esc(e.cliente||'Cliente non indicato')}</b> · ${esc(opDi(e.operatrice_id).nome)} · ${esc(t.fonte||t.nome)}</div><div class="row-sub">preso ${labelGiorno(e.data)} ${hhmm(e.ora)}${e.telefono?' · '+esc(e.telefono):''}</div></div><button class="btn btn-sm btn-primary" onclick="apriEvento(${e.id},'${oggiIso()}')"><i class="ti ti-calendar-plus"></i> Metti in calendario</button></div>`;}).join('')}${senza.length>30?`<div class="muted" style="padding:8px 14px">e altri ${senza.length-30}…</div>`:''}</div>`:'';
   el.innerHTML=head+body+listaSenza;
 }
+// Appuntamento in elenco (vista settimana): ora, (consulente) fonte - cliente, sotto telefonista · telefono e indirizzo
+function itemEv(e){const o=opDi(e.operatrice_id);return `<div class="cal-item" style="${stileEv(e)}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${e.ora_appuntamento?hm(e.ora_appuntamento)+(fineEv(e)?'–'+fineEv(e):'')+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b><span class="cal-sub">${esc([o.senza?'':o.nome.split(' ')[0],e.telefono].filter(Boolean).join(' · '))}</span>${e.indirizzo?`<span class="cal-sub">${esc(e.indirizzo)}</span>`:''}</div>`;}
 function chipEv(e){return `<div class="cal-ev solido" style="${stileEv(e)}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</div>`;}
 // Appuntamenti che si sovrappongono nello stesso giorno: affiancati in colonne, come in Google Calendar
 function layoutEv(lista){
