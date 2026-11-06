@@ -1230,7 +1230,7 @@ function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarg
 // Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
 function apriEvento(id,data,ora){
   const e=id?(_calEvs.find(x=>x.id===id)||Object.values(_cache).flatMap(c=>c.regs.concat(c.cal||[])).find(x=>x.id===id)):null;
-  if(id&&!e)return toast('Appuntamento non trovato');
+  if(id&&!e){api(`cc_registrazioni?id=eq.${id}&select=*`).then(r=>{if(r[0]){_calEvs.push(r[0]);apriEvento(id,data,ora);}else toast('Appuntamento non trovato');}).catch(x=>toast('Errore: '+x.message));return;}   // non in memoria (es. dalla scheda Lavagna): lo carico
   const ro=!_calEdit&&currentUser?.ruolo!=='admin';
   const appTipi=tipiAttivi().filter(t=>t.gruppo==='appuntamenti');
   if(e&&!appTipi.some(t=>t.codice===e.tipo_codice)&&tipoDi(e.tipo_codice).gruppo==='appuntamenti')appTipi.push(tipoDi(e.tipo_codice));   // es. «Non indicata» (arrivato da Google)
@@ -1269,12 +1269,14 @@ async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PA
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
 let _lavSett=null;
 async function caselleLavagna(codice,delta){const t=tipoDi(codice),n=Math.max(10,(t.caselle_lavagna||20)+delta);try{await api(`cc_tipi?codice=eq.${codice}`,'PATCH',{caselle_lavagna:n});t.caselle_lavagna=n;renderLavagna();toast(`${t.fonte}: ${n} caselle in fondo`);}catch(e){toast('Errore: '+e.message);}}
-function renderLavagna(){
+async function renderLavagna(){
   const el=document.getElementById('tab-lavagna');if(!_lavSett)_lavSett=lunediDi(oggiIso());
+  let senzaFonte=[];try{senzaFonte=await api(`cc_registrazioni?tipo_codice=eq.app_altro&data=gte.${_lavSett}&data=lte.${isoAddDays(_lavSett,6)}&select=id,cliente,data_appuntamento&order=data_appuntamento`);}catch(e){}
   const tvUrl=new URL('tv.html',location.href).href;
   el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSett=lunediDi(oggiIso());renderLavagna()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,-7);renderLavagna()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,7);renderLavagna()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSett)}</div>
       <a class="btn btn-sm" href="${tvUrl}" target="_blank"><i class="ti ti-device-tv"></i> Lavagna per la TV</a><a class="btn btn-sm" href="${tvUrl}?vista=calendario" target="_blank"><i class="ti ti-calendar"></i> Calendario a blocchi per la TV</a></div>
     <div class="muted" style="padding:0 4px 6px">Sulla TV apri «Lavagna per la TV» a schermo intero (F11): mostra solo la lavagna. Il calendario della settimana a blocchi è una pagina a parte. Si aggiorna da sola. Nei giorni: gli appuntamenti fissati, col colore della fonte (P. = Piemonte, E. = Emilia-Romagna). In fondo: gli appuntamenti presi nella settimana per fonte, caselle vuote che si riempiono di <b>nero</b> (appuntamento nella stessa settimana: il giorno dopo o i seguenti) o di <b>rosso</b> (settimana successiva).</div>
+    ${senzaFonte.length?`<div class="alert alert-info" style="margin:0 4px 10px"><b>${senzaFonte.length} appuntament${senzaFonte.length===1?'o':'i'} senza fonte</b> presi questa settimana (non compaiono nelle caselle in fondo): ${senzaFonte.slice(0,8).map(r=>`<a href="#" onclick="event.preventDefault();apriEvento(${r.id})">${esc(r.cliente||'Cliente n.i.')}</a>`).join(', ')}${senzaFonte.length>8?' …':''}. Aprili e scegli la fonte.</div>`:''}
     <div class="flex wrap" style="gap:8px;padding:0 4px 10px;align-items:center"><span class="muted">Caselle in fondo:</span>${tipiAttivi().filter(t=>t.gruppo==='appuntamenti'&&t.fonte).map(t=>`<span class="pill bg-${t.colore} c-${t.colore}" style="gap:6px">${esc(t.fonte)} <b>${t.caselle_lavagna||20}</b> <button class="btn btn-xs" title="Togli 10 caselle" onclick="caselleLavagna('${t.codice}',-10)">−10</button><button class="btn btn-xs" title="Aggiungi 10 caselle" onclick="caselleLavagna('${t.codice}',10)">+10</button></span>`).join('')}</div>
     <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSett}" style="width:100%;height:calc(100vh - 230px);min-height:560px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
 }

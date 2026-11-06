@@ -193,7 +193,8 @@ function disegnaLavagna(){
         <div class="pe"><span class="p">P.${P.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(1,P.length)-P.length,'box')}</span><span class="e">E.${E.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(2,E.length)-E.length,'box')}</span></div></div>`;
     });
   });
-  const fonti=fontiMostrate();
+  // in fondo solo le fonti vere (CC, Internet, Stand, Referenze): gli appuntamenti senza fonte restano nei giorni (grigi) finché l'ufficio non la mette
+  const fonti=[...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&t.attivo&&t.fonte).map(t=>t.fonte))];
   const sigla=f=>({'CC':'C.C.','Stand':'ST.','Internet':'INTERNET','Referenze':'R.F.'})[f]||f.toUpperCase();
   h+=`<div class="tot">${fonti.map(f=>{const t=tipi.find(y=>y.gruppo==='appuntamenti'&&(y.fonte||y.nome)===f)||tipi.find(y=>(y.fonte||y.nome)===f),lista=pren.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length,base=t.caselle_lavagna||20,n=Math.max(base,Math.ceil(lista.length/10)*10);
     return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} presi su ${base}${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle" style="--tcols:${n<=20?10:n<=40?20:Math.ceil(n/2)}">${lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(n-lista.length)}</div></div>`;}).join('')}</div>`;
