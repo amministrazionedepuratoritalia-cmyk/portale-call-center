@@ -13,13 +13,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 const TZ = "Europe/Rome";
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 // Configurazione: dalle variabili d'ambiente oppure dalla tabella cc_sync_state (protetta da RLS, la legge solo la chiave di servizio)
-let SA: any = {}, CAL_ID = "", HOOK_SECRET = "", FONTE_DEFAULT = "app_cc", IMPORTATO_IL = "", IMPORTA_DA = "", SCRIVI = false, _cfgAt = 0;
+let SA: any = {}, CAL_ID = "", HOOK_SECRET = "", FONTE_DEFAULT = "app_cc", IMPORTATO_IL = "", IMPORTA_DA = "", SCRIVI = false, SCRIVI_DA = "", _cfgAt = 0;
 async function config() {
   if (Date.now() - _cfgAt < 60000 && HOOK_SECRET) return;
   const righe = (await sb.from("cc_sync_state").select("k,v")).data || [];
   const cfg = (k: string) => Deno.env.get(k) || righe.find((r: any) => r.k === k)?.v || "";
   SA = JSON.parse(cfg("GCAL_SERVICE_ACCOUNT") || "{}"); CAL_ID = cfg("GCAL_CALENDAR_ID"); HOOK_SECRET = cfg("GCAL_HOOK_SECRET"); FONTE_DEFAULT = cfg("GCAL_FONTE_DEFAULT") || "app_cc";
-  IMPORTATO_IL = cfg("GCAL_IMPORTATO_IL"); IMPORTA_DA = cfg("GCAL_IMPORTA_DA"); SCRIVI = cfg("GCAL_SCRIVI") === "1";   // scrittura portale → Google: spenta salvo GCAL_SCRIVI = 1
+  IMPORTATO_IL = cfg("GCAL_IMPORTATO_IL"); IMPORTA_DA = cfg("GCAL_IMPORTA_DA"); SCRIVI = cfg("GCAL_SCRIVI") === "1"; SCRIVI_DA = cfg("GCAL_SCRIVI_DA");   // scrittura portale → Google: solo se GCAL_SCRIVI = 1, e crea eventi solo per le righe registrate (data) da GCAL_SCRIVI_DA in poi
   _cfgAt = Date.now();
 }
 
@@ -65,7 +65,9 @@ async function base() {
 const tipoDi = (c: string) => _tipi.find((t) => t.codice === c);
 const opDi = (id: number | null) => _ops.find((o) => o.id === id);
 const isApp = (c: string) => tipoDi(c)?.gruppo === "appuntamenti";
-const COLORI: Record<string, string> = { blue: "9", amber: "6", indigo: "3", green: "10", purple: "3", red: "11", pink: "4", gray: "8" };
+// Colore dell'evento su Google = colore della fonte nel calendario del gestionale (Davide 06/11): blu CC → Pavone, ambra Stand → Mandarino,
+// indigo Internet → Mirtillo, verde Referenze → Basilico, grigio «non indicata» → Grafite
+const COLORI: Record<string, string> = { blue: "7", amber: "6", indigo: "9", green: "10", purple: "3", red: "11", pink: "4", gray: "8" };
 
 // ── data/ora ──
 function addMin(data: string, ora: string, min: number) {
@@ -137,7 +139,7 @@ function eventoDa(r: any) {
   if (r.ora_appuntamento) {
     const ora = String(r.ora_appuntamento).slice(0, 5);
     ev.start = { dateTime: `${r.data_appuntamento}T${ora}:00`, timeZone: TZ };
-    ev.end = { dateTime: addMin(r.data_appuntamento, ora, r.durata_min || 60), timeZone: TZ };
+    ev.end = { dateTime: addMin(r.data_appuntamento, ora, r.durata_min || 120), timeZone: TZ };   // 2 ore come gli appuntamenti dell'ufficio
   } else { ev.start = { date: r.data_appuntamento }; ev.end = { date: addDays(r.data_appuntamento, 1) }; }
   return ev;
 }
@@ -152,7 +154,7 @@ async function push(tipo: string, record: any, old: any) {
   if (!r || !isApp(r.tipo_codice) && !(old && isApp(old.tipo_codice))) return "non è un appuntamento";
   // REGOLA (Davide 05/11): gli eventi nati su Google Calendar non si toccano mai: né modifiche né cancellazioni
   if (r.origine === "google" || old?.origine === "google") return "nato su Google: non si tocca";
-  // e la scrittura verso Google (anche per gli appuntamenti nati nel portale) è spenta finché Davide non la vuole
+  // la scrittura verso Google degli appuntamenti nati nel portale si accende con GCAL_SCRIVI = 1 (riaccesa il 06/11 su richiesta di Davide)
   if (!SCRIVI) return "scrittura su Google spenta";
   // riga appena creata dal pull (l'evento esiste già su Google): lo lascio com'è
   if (tipo === "INSERT" && record?.google_event_id) return "arrivato da Google";
@@ -176,6 +178,8 @@ async function push(tipo: string, record: any, old: any) {
       return "evento aggiornato";
     }
   }
+  // eventi nuovi solo per gli appuntamenti registrati da GCAL_SCRIVI_DA in poi: niente creazioni a ritroso per righe vecchie che vengono ritoccate
+  if (SCRIVI_DA && String(record.data || "") < SCRIVI_DA) return "registrato prima di " + SCRIVI_DA + ": non lo creo su Google";
   const creato = await gapi("/events", "POST", voluto);
   await sb.from("cc_registrazioni").update({ google_event_id: creato.id, google_sync_at: new Date().toISOString() }).eq("id", record.id);
   return "evento creato " + creato.id;
@@ -335,7 +339,7 @@ Deno.serve(async (req) => {
         const res = await gapi("/events?" + q.toString());
         for (const ev of res.items || []) {
           const nostro = (ev.creator?.email || "") === SA.client_email, firma = (ev.description || "").includes("Portale Call Center");
-          if (nostro || firma) out.push({ id: ev.id, status: ev.status, summary: ev.summary, start: ev.start?.dateTime || ev.start?.date, creator: ev.creator?.email, updated: ev.updated, created: ev.created, firma, descr: (ev.description || "").slice(0, 160), colorId: ev.colorId });
+          if (nostro || firma) out.push({ id: ev.id, status: ev.status, summary: ev.summary, start: ev.start?.dateTime || ev.start?.date, end: ev.end?.dateTime || ev.end?.date, creator: ev.creator?.email, updated: ev.updated, created: ev.created, firma, descr: (ev.description || "").slice(0, 160), colorId: ev.colorId });
         }
         if (!res.nextPageToken) break; pageToken = res.nextPageToken;
       }

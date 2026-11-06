@@ -47,7 +47,7 @@ create table if not exists cc_registrazioni (
   telefono          text,
   data_appuntamento date,
   ora_appuntamento  time,
-  durata_min        int         not null default 60,
+  durata_min        int         not null default 120,   -- 2 ore come gli appuntamenti dell'ufficio (018)
   indirizzo         text,
   venditore         text,                                      -- chi fa la demo
   note              text,

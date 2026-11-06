@@ -291,7 +291,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.7 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.8 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -720,7 +720,7 @@ function apriDettaglio(t){
 }
 async function salvaDettaglio(codice){
   const v=id=>document.getElementById(id).value.trim();
-  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,ora_appuntamento:v('d-oraapp')||null,indirizzo:v('d-indirizzo')||null,zona:v('d-zona')||null,note:v('d-note')||null});
+  const ok=await salvaRegistrazione({tipo_codice:codice,cliente:v('d-cliente')||null,telefono:v('d-telefono')||null,data_appuntamento:v('d-dataapp')||null,ora_appuntamento:v('d-oraapp')||null,durata_min:120,indirizzo:v('d-indirizzo')||null,zona:v('d-zona')||null,note:v('d-note')||null});
   if(ok)chiudiModal();
 }
 async function loadAppOp(){
@@ -842,7 +842,7 @@ async function renderSviluppatore(){
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   const anno=oggiIso().slice(0,4);let stato=[],nGoogle='?',nSenza='?',nPortale='?';
   try{[stato,nGoogle,nSenza,nPortale]=await Promise.all([
-    api('cc_sync_state?select=k,v,updated_at&k=in.(GCAL_CALENDAR_ID,GCAL_IMPORTATO_IL,GCAL_IMPORTA_DA,GCAL_SCRIVI,syncToken,pullPageToken,pullLock)'),
+    api('cc_sync_state?select=k,v,updated_at&k=in.(GCAL_CALENDAR_ID,GCAL_IMPORTATO_IL,GCAL_IMPORTA_DA,GCAL_SCRIVI,GCAL_SCRIVI_DA,syncToken,pullPageToken,pullLock)'),
     conta(`cc_registrazioni?select=id&origine=eq.google&data=gte.${anno}-01-01`),
     conta(`cc_registrazioni?select=id&origine=eq.google&data=gte.${anno}-01-01&operatrice_id=is.null`),
     conta(`cc_registrazioni?select=id&origine=eq.portale&data=gte.${anno}-01-01`)]);}catch(e){}
@@ -859,7 +859,7 @@ async function renderSviluppatore(){
     <div class="card card-flush" style="margin-bottom:18px">
       ${riga('ti-calendar','blue','Calendario collegato',esc(v('GCAL_CALENDAR_ID')||'nessuno'))}
       ${riga('ti-refresh','green','Lettura da Google',`Ultima: <b>${quando(st('syncToken')?.updated_at)}</b> · ${lettura}`)}
-      ${riga('ti-pencil-off',v('GCAL_SCRIVI')==='1'?'red':'gray','Scrittura su Google',v('GCAL_SCRIVI')==='1'?'<b>ACCESA</b>':'spenta: il portale legge e basta')}
+      ${riga(v('GCAL_SCRIVI')==='1'?'ti-pencil':'ti-pencil-off',v('GCAL_SCRIVI')==='1'?'green':'gray','Scrittura su Google',v('GCAL_SCRIVI')==='1'?`<b>accesa</b> solo per gli appuntamenti nati nel portale (registrati dal ${ddmmyyyy(v('GCAL_SCRIVI_DA'))||'inizio'}): quelli nati su Google non si toccano mai`:'spenta: il portale legge e basta')}
       ${riga('ti-calendar-stats','indigo','Eventi di quest\'anno',`<b>${nGoogle}</b> arrivati da Google (<b>${nSenza}</b> senza telefonista riconosciuta) · <b>${nPortale}</b> registrati nel portale`)}
       ${riga('ti-flag','amber','Regole',`Contano gli eventi creati su Google dal <b>${v('GCAL_IMPORTATO_IL')?labelGiorno(v('GCAL_IMPORTATO_IL').slice(0,10)):'?'}</b> in poi (i precedenti sono «solo calendario») · importati dal <b>${ddmmyyyy(v('GCAL_IMPORTA_DA'))||'?'}</b>`)}
     </div>
@@ -869,7 +869,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v3.7')}
+      ${riga('ti-info-circle','gray','Versione','v3.8')}
     </div>`;
 }
 
@@ -1243,7 +1243,7 @@ function onLive(payload){
 //  Admin: click su uno spazio libero = nuovo appuntamento, click su un appuntamento = modifica. Telefoniste: solo lettura.
 // ══════════════════════════════════════════════════════════════
 let _calVista=window.matchMedia('(max-width:700px)').matches?'giorno':'sett',_calData=oggiIso(),_calEdit=false,_calEl=null,_calEvs=[];
-const CAL_H0=8,CAL_H1=20,CAL_HH=44;   // ore mostrate e altezza di un'ora in px
+const CAL_H0=8,CAL_H1=23,CAL_HH=44;   // ore mostrate (8 → 23: gli appuntamenti delle 20:30 durano fino alle 22:30) e altezza di un'ora in px
 function lunediDi(iso){return isoAddDays(iso,-((isoToDate(iso).getDay()+6)%7));}
 function hm(t){return t?String(t).slice(0,5):'';}
 function minuti(t){if(!t)return null;const[h,m]=String(t).split(':').map(Number);return h*60+m;}
@@ -1292,13 +1292,13 @@ async function renderCalendario(target,editable){
 function chipEv(e){const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue;return `<div class="cal-ev bg-${t.colore}" style="border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</div>`;}
 // Appuntamenti che si sovrappongono nello stesso giorno: affiancati in colonne, come in Google Calendar
 function layoutEv(lista){
-  const evs=lista.map(e=>({e,s:minuti(e.ora_appuntamento),f:minuti(e.ora_appuntamento)+Math.max(30,e.durata_min||60)})).sort((a,b)=>a.s-b.s||a.f-b.f);
+  const evs=lista.map(e=>({e,s:minuti(e.ora_appuntamento),f:minuti(e.ora_appuntamento)+Math.max(30,e.durata_min||120)})).sort((a,b)=>a.s-b.s||a.f-b.f);
   const out=[];let cluster=[],fine=-1;
   const chiudi=()=>{if(!cluster.length)return;const cols=[];cluster.forEach(x=>{let c=cols.findIndex(end=>end<=x.s);if(c<0){c=cols.length;cols.push(x.f);}else cols[c]=x.f;x.col=c;});cluster.forEach(x=>{x.ncol=cols.length;out.push(x);});cluster=[];};
   evs.forEach(x=>{if(x.s>=fine)chiudi();fine=Math.max(fine,x.f);cluster.push(x);});chiudi();
   return out;
 }
-function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||60)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([o.senza?'':o.nome.split(' ')[0],e.zona?ZONE[e.zona]:'',e.venditore?'→ '+e.venditore:'',e.indirizzo].filter(Boolean).join(' · '))}</div>`;}
+function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),c=COLORE_HEX[t.colore]||COLORE_HEX.blue,m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||120)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block bg-${t.colore}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;border-left-color:${c}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(e.cliente||'Cliente n.i.')}</b>${esc([o.senza?'':o.nome.split(' ')[0],e.zona?ZONE[e.zona]:'',e.venditore?'→ '+e.venditore:'',e.indirizzo].filter(Boolean).join(' · '))}</div>`;}
 function calClickGiorno(ev,g){if(_calVista==='mese'&&(!_calEdit||window.matchMedia('(max-width:700px)').matches)){_calData=g;calVista('giorno');return;}if(!_calEdit)return;apriEvento(null,g);}
 function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarget.getBoundingClientRect().top;const h=CAL_H0+Math.floor(y/CAL_HH),m=Math.floor((y%CAL_HH)/(CAL_HH/2))*30;apriEvento(null,g,`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 // Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
@@ -1310,7 +1310,7 @@ function apriEvento(id,data,ora){
   if(e&&!appTipi.some(t=>t.codice===e.tipo_codice)&&tipoDi(e.tipo_codice).gruppo==='appuntamenti')appTipi.push(tipoDi(e.tipo_codice));   // es. «Non indicata» (arrivato da Google)
   const ops=operatrici.filter(o=>!isAdmin(o)&&(o.attiva||(e&&o.id===e.operatrice_id)));
   const venditori=[...new Set(_calEvs.map(x=>x.venditore).filter(Boolean))].sort();
-  const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:60,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',zona:'',note:''};
+  const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:120,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',zona:'',note:''};
   if(e&&data&&!e.data_appuntamento)v.data_appuntamento=data;
   const dis=ro?'disabled':'';
   apriModal(`<h2>${id?(ro?'Appuntamento':'Modifica appuntamento'):'Nuovo appuntamento'}</h2>${e?`<div class="muted">${e.solo_calendario?'Importato da Google Calendar · creato':'Preso'} ${labelGiorno(e.data)} ${hhmm(e.ora)}${e.solo_calendario&&!e.operatrice_id?'':' da '+esc(opDi(e.operatrice_id).nome)}</div>`:''}
@@ -1319,7 +1319,7 @@ function apriEvento(id,data,ora){
     <div class="two-col"><div><label>Telefono</label><input id="ev-telefono" inputmode="tel" value="${esc(v.telefono||'')}" ${dis}></div><div><label>Fonte</label><select id="ev-tipo" ${dis}>${appTipi.map(t=>`<option value="${t.codice}" ${t.codice===v.tipo_codice?'selected':''}>${esc(t.fonte||t.nome)}</option>`).join('')}</select></div></div>
     <label>Indirizzo</label><input id="ev-indirizzo" value="${esc(v.indirizzo||'')}" placeholder="Via, città" ${dis}>
     <div class="two-col"><div><label>Data</label><input type="date" id="ev-data" value="${v.data_appuntamento||''}" ${dis}></div><div><label>Ora</label><input type="time" id="ev-ora" value="${hm(v.ora_appuntamento)}" step="900" ${dis}></div></div>
-    <div class="two-col"><div><label>Durata (minuti)</label><input type="number" id="ev-durata" value="${v.durata_min||60}" min="15" step="15" ${dis}></div><div><label>Zona</label><select id="ev-zona" ${dis}><option value="">Lombardia</option><option value="P" ${v.zona==='P'?'selected':''}>Piemonte</option><option value="E" ${v.zona==='E'?'selected':''}>Emilia-Romagna</option></select></div></div>
+    <div class="two-col"><div><label>Durata (minuti)</label><input type="number" id="ev-durata" value="${v.durata_min||120}" min="15" step="15" ${dis}></div><div><label>Zona</label><select id="ev-zona" ${dis}><option value="">Lombardia</option><option value="P" ${v.zona==='P'?'selected':''}>Piemonte</option><option value="E" ${v.zona==='E'?'selected':''}>Emilia-Romagna</option></select></div></div>
     <label>Venditore (chi fa la demo)</label><input id="ev-venditore" value="${esc(v.venditore||'')}" list="venditori-list" ${dis}><datalist id="venditori-list">${venditori.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
     <label>Telefonista</label><select id="ev-op" ${dis}><option value="">— senza telefonista —</option>${ops.map(o=>`<option value="${o.id}" ${o.id===v.operatrice_id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
     <label>Note</label><textarea id="ev-note" rows="2" ${dis}>${esc(v.note||'')}</textarea>
@@ -1329,7 +1329,7 @@ function apriEvento(id,data,ora){
 }
 async function salvaEvento(id){
   const v=i=>document.getElementById(i).value.trim();
-  const body={cliente:v('ev-cliente')||null,telefono:v('ev-telefono')||null,indirizzo:v('ev-indirizzo')||null,data_appuntamento:v('ev-data')||null,ora_appuntamento:v('ev-ora')||null,durata_min:+v('ev-durata')||60,tipo_codice:v('ev-tipo'),venditore:v('ev-venditore')||null,zona:v('ev-zona')||null,note:v('ev-note')||null,operatrice_id:v('ev-op')?+v('ev-op'):null};
+  const body={cliente:v('ev-cliente')||null,telefono:v('ev-telefono')||null,indirizzo:v('ev-indirizzo')||null,data_appuntamento:v('ev-data')||null,ora_appuntamento:v('ev-ora')||null,durata_min:+v('ev-durata')||120,tipo_codice:v('ev-tipo'),venditore:v('ev-venditore')||null,zona:v('ev-zona')||null,note:v('ev-note')||null,operatrice_id:v('ev-op')?+v('ev-op'):null};
   try{
     if(id)await api(`cc_registrazioni?id=eq.${id}`,'PATCH',body);
     else await api('cc_registrazioni','POST',{...body,data:oggiIso(),ora:new Date().toISOString()});

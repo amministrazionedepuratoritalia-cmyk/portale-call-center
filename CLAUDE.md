@@ -9,3 +9,4 @@
 - Si risponde in italiano, corto e schematico.
 - Righe con `solo_calendario = true` (eventi importati da Google Calendar): calendario e lavagna TV sì, statistiche no. Ogni lettura di `cc_registrazioni` per le statistiche filtra `solo_calendario=is.false`.
 - Mai inventare attribuzioni: un appuntamento senza fonte certa è `app_altro` («Fonte non indicata»), senza telefonista è `operatrice_id` null.
+- Google Calendar: gli eventi nati su Google (`origine = 'google'`) non si toccano MAI (la funzione `gcal-sync` esce subito). Gli appuntamenti nati nel portale vengono copiati su Google (2 ore, colore della fonte) se `GCAL_SCRIVI = 1`. Mai UPDATE di massa su `cc_registrazioni` senza `google_sync_at = now()` o trigger spenti.
