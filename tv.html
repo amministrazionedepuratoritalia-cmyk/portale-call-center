@@ -57,8 +57,8 @@
     .lav .fascia { font-weight:800; font-size:15px; color:#5B2A86; display:flex; flex-direction:column; justify-content:center; line-height:1.15; }
     .lav .cella { display:flex; flex-direction:column; justify-content:space-between; min-height:0; overflow:hidden; }
     .lav .cella.today { background:#FAFCFF; }
-    .caselle { display:grid; grid-template-columns:repeat(var(--cols,4),1fr); gap:4px; }
-    .casella { aspect-ratio:1/1; border:2px solid #3B6FD8; border-radius:3px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:22px; line-height:1; position:relative; background:#fff; }
+    .caselle { display:flex; flex-wrap:wrap; gap:4px; }
+    .casella { width:var(--box,26px); height:var(--box,26px); flex:none; border:2px solid #3B6FD8; border-radius:3px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:22px; line-height:1; position:relative; background:#fff; box-sizing:border-box; }
     .casella.piena { color:#fff; font-size:15px; }
     .pe .box.piena { color:#fff; font-size:11px; }
     .pe { display:flex; gap:10px; align-items:center; margin-top:4px; font-weight:800; font-size:13px; }
@@ -69,7 +69,8 @@
     .tot > div:last-child { border-right:none; }
     .tot .lbl { font-weight:900; font-size:16px; letter-spacing:1px; margin-bottom:4px; display:flex; align-items:baseline; gap:8px; }
     .tot .lbl small { font-weight:700; font-size:12px; color:var(--text3); letter-spacing:0; }
-    .tot .caselle { grid-template-columns:repeat(var(--tcols,10),1fr); gap:3px; }
+    .tot .caselle { gap:3px; }
+    .tot .casella { width:var(--tbox,18px); height:var(--tbox,18px); font-size:12px; }
     .tot .casella { font-size:12px; border-width:1.5px; }
     .tot .casella.piena { color:#fff; }
     .vuoto { color:var(--text3); font-size:14px; padding:20px; text-align:center; }
@@ -90,7 +91,6 @@
     body.scorri .lav { grid-template-rows:auto repeat(4,auto) auto; }
     body.scorri .lav .cella { overflow:visible; }
     body.scorri .cal { min-height:72vh; }
-    .casella { min-width:14px; min-height:14px; }
     /* telefono: un giorno sotto l'altro, caselle di misura fissa */
     .lav-m { flex:1; display:flex; flex-direction:column; gap:10px; }
     .lav-m .giorno-m { border:2px solid #222; border-radius:10px; background:#fff; overflow:hidden; }
@@ -100,7 +100,7 @@
     .lav-m .fascia-m { display:grid; grid-template-columns:60px 1fr; gap:8px; padding:7px 10px; border-top:1px solid #ddd; align-items:start; }
     .lav-m .fascia-m .lbl { font-weight:800; color:#5B2A86; font-size:13px; line-height:1.15; }
     .caselle-m { display:flex; flex-wrap:wrap; gap:4px; }
-    .caselle-m .casella { width:24px; height:24px; aspect-ratio:auto; font-size:14px; }
+    .caselle-m .casella { width:24px; height:24px; font-size:14px; }
     .lav-m .pe { margin-top:5px; flex-wrap:wrap; }
     .lav-m .tot-m { border:2px solid #222; border-radius:10px; background:#fff; padding:8px 10px; display:flex; flex-direction:column; gap:10px; }
     .lav-m .tot-m .lbl { font-weight:800; font-size:14px; margin-bottom:4px; }
@@ -155,6 +155,9 @@ const tipoDi=c=>tipi.find(t=>t.codice===c)||{nome:c,colore:'gray'};
 const opDi=id=>(id!=null&&operatrici.find(o=>o.id===id))||{nome:'Senza telefonista',senza:true};
 const start=q.get('settimana')||lunediDi(oggiIso());   // lunedì della settimana mostrata (la TV mostra quella corrente)
 const giorni=[];for(let i=0;i<6;i++)giorni.push(isoAddDays(start,i));
+// giorno delle caselle in fondo (appuntamenti PRESI quel giorno; ogni giorno si riparte da vuote): oggi se è nella settimana mostrata, altrimenti il lunedì di quella settimana o ?giorno=
+function giornoFondo(){const g=q.get('giorno')||oggiIso();return (g>=giorni[0]&&g<=isoAddDays(giorni[0],6))?g:giorni[0];}
+function labelGiornoFondo(){const g=giornoFondo();if(g===oggiIso())return 'oggi';const d=isoToDate(g);return GIORNI_BREVI[d.getDay()].toLowerCase()+' '+d.getDate()+'/'+(d.getMonth()+1);}
 function titoloSett(){const a=isoToDate(giorni[0]),b=isoToDate(giorni[5]);return `${a.getDate()} ${MESI_BREVI[a.getMonth()]} – ${b.getDate()} ${MESI_BREVI[b.getMonth()]} ${b.getFullYear()}`;}
 
 async function carica(){
@@ -164,7 +167,7 @@ async function carica(){
     const cod=tipi.filter(x=>x.gruppo==='appuntamenti').map(x=>x.codice);
     [evs,pren]=cod.length?await Promise.all([
       api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${giorni[0]}&data_appuntamento=lte.${giorni[5]}&select=id,operatrice_id,tipo_codice,cliente,indirizzo,venditore,data_appuntamento,ora_appuntamento,durata_min,demo,zona&order=data_appuntamento,ora_appuntamento`),
-      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data=gte.${giorni[0]}&data=lte.${isoAddDays(giorni[0],6)}&solo_calendario=is.false&select=id,tipo_codice,cliente,data,data_appuntamento,ora_appuntamento,demo,zona&order=data,ora`)]):[[],[]];
+      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data=eq.${giornoFondo()}&solo_calendario=is.false&select=id,tipo_codice,cliente,data,data_appuntamento,ora_appuntamento,demo,zona&order=ora`)]):[[],[]];
     disegna();
     document.getElementById('agg').textContent='aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
   }catch(e){document.getElementById('agg').textContent='errore: '+e.message;}
@@ -172,7 +175,7 @@ async function carica(){
 // fonti mostrate: quelle attive, più «Non indicata» solo se in settimana c'è qualche appuntamento senza fonte (arrivato da Google)
 function fontiMostrate(){return [...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&(t.attivo||evs.some(e=>e.tipo_codice===t.codice)||pren.some(e=>e.tipo_codice===t.codice))).map(t=>t.fonte||t.nome))];}
 function legenda(){const f=fontiMostrate();return f.map(x=>{const t=tipi.find(y=>(y.fonte||y.nome)===x);return `<span><i style="background:${COLORE_HEX[t.colore]||'#000'}"></i>${esc(x)}</span>`;}).join('')+'<span>✓ demo fatta</span>';}
-function legendaLav(){return legenda()+`<span><i style="background:${NERO}"></i>in fondo: settimana in corso (e venerdì per lunedì)</span><span><i style="background:${ROSSO}"></i>in fondo: settimana successiva</span><span>P. Piemonte · E. Emilia-Romagna</span>`;}
+function legendaLav(){return legenda()+`<span>in fondo: presi ${labelGiornoFondo()} ·</span><span><i style="background:${NERO}"></i>settimana in corso (e venerdì per lunedì)</span><span><i style="background:${ROSSO}"></i>settimana successiva</span><span>P. Piemonte · E. Emilia-Romagna</span>`;}
 function disegna(){
   document.getElementById('sett').textContent='Settimana '+titoloSett();
   const l1=document.getElementById('leg1');if(l1)l1.innerHTML=legenda();const l2=document.getElementById('leg2');if(l2)l2.innerHTML=legendaLav();
@@ -206,7 +209,7 @@ function disegnaCalendario(){
 const NERO='#111111',ROSSO='#CC1B1B';
 function fasciaDi(e){const m=minuti(e.ora_appuntamento);if(m==null)return 0;const i=FASCE.findIndex(f=>m>=f.da&&m<f.a);return i<0?0:i;}
 function coloreFonte(e){return COLORE_HEX[tipoDi(e.tipo_codice).colore]||'#636366';}
-// in fondo (Davide 06/11): NERO = appuntamento nella settimana in corso (quella in cui è stato preso), ROSSO = settimana successiva;
+// in fondo (Davide 06/11): caselle degli appuntamenti PRESI OGGI (ogni giorno si riparte); NERO = appuntamento nella settimana in corso, ROSSO = settimana successiva;
 // unica eccezione: preso venerdì (o sabato) per il lunedì della settimana dopo = NERO
 function colorePreso(e){if(!e.data_appuntamento||!e.data)return NERO;const lp=lunediDi(e.data),la=lunediDi(e.data_appuntamento);if(la<=lp)return NERO;const wd=isoToDate(e.data).getDay();if((wd===5||wd===6)&&e.data_appuntamento===isoAddDays(lp,7))return NERO;return ROSSO;}
 const ggmm=iso=>iso?iso.split('-').reverse().slice(0,2).join('/'):'';
@@ -228,24 +231,28 @@ function disegnaLavagna(){
   const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
   if(el.clientWidth<680){disegnaLavagnaTelefono(el,perG);return;}
   el.className='lav';if(!EMBED)document.body.classList.remove('scorri');
-  // caselle per riga: 4 come sulla lavagna vera; di più se una cella ne ha tante, così al massimo 3 righe e tutto sta nello schermo
+  // misura delle caselle dallo spazio: 4 per riga come sulla lavagna vera, di più se una cella ne ha tante (al massimo 3 righe);
+  // vanno a capo da sole, quindi non escono mai dal riquadro
   const maxCella=Math.max(CASELLE_FASCIA,...giorni.flatMap(g=>FASCE.map((f,i)=>(perG[g]||[]).filter(e=>fasciaDi(e)===i&&!e.zona).length)));
-  el.style.setProperty('--cols',String(Math.max(4,Math.ceil(maxCella/3))));
+  const cols=Math.max(4,Math.ceil(maxCella/3)),cellaW=(el.clientWidth-72)/6-14;
+  el.style.setProperty('--box',Math.max(12,Math.min(30,Math.floor((cellaW-(cols-1)*4)/cols)))+'px');
+  const gruppoW=el.clientWidth/4-14,maxFondo=Math.max(20,...gruppiFondo().map(x=>x.n)),perRiga=maxFondo>=40?20:10;
+  el.style.setProperty('--tbox',Math.max(10,Math.min(22,Math.floor((gruppoW-(perRiga-1)*3)/perRiga)))+'px');
   let h=`<div></div>${giorni.map(g=>{const d=isoToDate(g);return `<div class="giorno${g===oggiIso()?' today':''}">${GIORNI[d.getDay()]}<small>${d.getDate()}|${d.getMonth()+1}</small></div>`;}).join('')}`;
   FASCE.forEach((f,i)=>{
     h+=`<div class="fascia">${f.lbl.split('\n').map(x=>`<span>${x}</span>`).join('')}</div>`;
     giorni.forEach(g=>{h+=`<div class="cella${g===oggiIso()?' today':''}">${cellaFascia((perG[g]||[]).filter(e=>fasciaDi(e)===i),'caselle')}</div>`;});
   });
-  h+=`<div class="tot">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle" style="--tcols:${x.n<=20?10:x.n<=40?20:Math.ceil(x.n/2)}">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
+  h+=`<div class="tot">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi ${labelGiornoFondo()} su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
   el.innerHTML=h;
-  // non ci sta nello schermo (portatile, tablet)? allora la pagina scorre invece di tagliare le caselle
-  if(!EMBED&&el.scrollHeight>el.clientHeight+2)document.body.classList.add('scorri');
+  // ci sta nello schermo? provo con la pagina libera di crescere: se supera l'altezza dello schermo resta così (scorre), altrimenti torna a riempire lo schermo
+  if(!EMBED){document.body.classList.add('scorri');if(document.documentElement.scrollHeight<=window.innerHeight+1)document.body.classList.remove('scorri');}
 }
 // Telefono: un giorno sotto l'altro, dentro le 4 fasce con le caselle; in fondo i gruppi per fonte
 function disegnaLavagnaTelefono(el,perG){
   el.className='lav-m';document.body.classList.add('scorri');
   let h=giorni.map(g=>{const d=isoToDate(g),n=(perG[g]||[]).length;return `<div class="giorno-m${g===oggiIso()?' today':''}"><h3><span>${GIORNI[d.getDay()]} ${d.getDate()}|${d.getMonth()+1}</span><small>${n} appuntament${n===1?'o':'i'}</small></h3>${FASCE.map((f,i)=>`<div class="fascia-m"><div class="lbl">${f.lbl.split('\n').join('<br>')}</div><div>${cellaFascia((perG[g]||[]).filter(e=>fasciaDi(e)===i),'caselle-m')}</div></div>`).join('')}</div>`;}).join('');
-  h+=`<div class="tot-m">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle-m">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
+  h+=`<div class="tot-m">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi ${labelGiornoFondo()} su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle-m">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
   el.innerHTML=h;
 }
 // ── orologio, aggiornamento automatico, tempo reale ──
