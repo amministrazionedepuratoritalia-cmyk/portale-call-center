@@ -290,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.2 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.3 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -312,6 +312,7 @@
     <div class="tab active" onclick="switchTab(this,'op-tab-oggi')"><i class="ti ti-headset"></i> Oggi</div>
     <div class="tab" onclick="switchTab(this,'op-tab-app');loadAppOp()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
     <div class="tab" onclick="switchTab(this,'op-tab-cal');renderCalendario(document.getElementById('op-cal'),false)"><i class="ti ti-calendar"></i> Calendario</div>
+    <div class="tab" onclick="switchTab(this,'op-tab-lav');renderLavagnaOp()"><i class="ti ti-chalkboard"></i> Lavagna</div>
     <div class="tab" onclick="switchTab(this,'op-tab-storico');loadStoricoOp()"><i class="ti ti-history"></i> Storico</div>
   </div>
   <div class="page-content">
@@ -324,6 +325,7 @@
       <div class="card card-flush" id="op-lista"></div>
     </div>
     <div id="op-tab-cal" class="hidden"><div id="op-cal"></div></div>
+    <div id="op-tab-lav" class="hidden"></div>
     <div id="op-tab-app" class="hidden">
       <div class="flex" style="margin-bottom:12px"><select id="op-app-mese" onchange="loadAppOp()"></select></div>
       <div id="op-app"></div>
@@ -1268,6 +1270,14 @@ async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PA
 
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
 let _lavSett=null;
+// Lavagna per le telefoniste: la stessa della TV, in sola lettura (niente caselle modificabili, niente elenco senza fonte)
+let _lavSettOp=null;
+function renderLavagnaOp(){
+  const el=document.getElementById('op-tab-lav');if(!_lavSettOp)_lavSettOp=lunediDi(oggiIso());
+  el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSettOp=lunediDi(oggiIso());renderLavagnaOp()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSettOp=isoAddDays(_lavSettOp,-7);renderLavagnaOp()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSettOp=isoAddDays(_lavSettOp,7);renderLavagnaOp()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSettOp)}</div></div>
+    <div class="muted" style="padding:0 4px 8px">La lavagna dell'ufficio, come sulla TV: nei giorni gli appuntamenti fissati (colore della fonte; P. = Piemonte, E. = Emilia-Romagna), in fondo gli appuntamenti presi nella settimana (nero = settimana in corso, rosso = settimana successiva). Si aggiorna da sola.</div>
+    <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSettOp}" style="width:100%;height:calc(100vh - 230px);min-height:560px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+}
 async function caselleLavagna(codice,delta){const t=tipoDi(codice),n=Math.max(10,(t.caselle_lavagna||20)+delta);try{await api(`cc_tipi?codice=eq.${codice}`,'PATCH',{caselle_lavagna:n});t.caselle_lavagna=n;renderLavagna();toast(`${t.fonte}: ${n} caselle in fondo`);}catch(e){toast('Errore: '+e.message);}}
 async function renderLavagna(){
   const el=document.getElementById('tab-lavagna');if(!_lavSett)_lavSett=lunediDi(oggiIso());
