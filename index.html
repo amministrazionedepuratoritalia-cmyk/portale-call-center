@@ -291,7 +291,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.6 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.7 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -437,6 +437,7 @@ let currentUser=null, tipi=[], operatrici=[], avvisi=[];
 let turnoAperto=null;          // turno in corso dell'operatrice loggata
 let regOggi=[];                // registrazioni di oggi dell'operatrice loggata
 let _timerTurno=null, _timerPoll=null, _rt=null, _rtOk=false;
+let _nuovoAccesso=false;       // true solo quando si entra col PIN (non quando la pagina si ricarica con la sessione salvata)
 const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
 // Registrazioni senza telefonista (demo dirette dei consulenti / stand): contano sulla fonte, non su una persona
@@ -505,6 +506,7 @@ async function doLogin(){
     document.getElementById('login-error').classList.add('hidden');
     ['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');
     sessionStorage.setItem('cc_user_id',res[0].id);
+    _nuovoAccesso=true;
     await entra(res[0]);
   }catch(e){showLoginError('Errore di connessione. Riprova.');}
 }
@@ -609,12 +611,12 @@ const FRASI_ADMIN=[
   ['I leader non chiedono motivazione: la danno.','Boiler Room'],
   ['Tutti vogliono il risultato. Pochi vogliono il lavoro. Tu sei tra i pochi.','Rocky'],
 ];
-function fraseDelGiorno(){const p=oggiIso().split('-').map(Number);const n=Math.floor(new Date(p[0],p[1]-1,p[2])/86400000);return FRASI_ADMIN[n%FRASI_ADMIN.length];}
 // Admin: saluto + frase del giorno, solo al primo ingresso della giornata su questo dispositivo
+// A OGNI accesso col PIN (Davide 06/11: «le frasi dammele ogni volta che entro»): le frasi girano una dopo l'altra per dispositivo
 function salutoAdmin(){
-  const k='cc_saluto_admin_'+currentUser.id;
-  try{if(localStorage.getItem(k)===oggiIso())return;localStorage.setItem(k,oggiIso());}catch(e){}
-  const h=new Date().getHours(),nome=esc(currentUser.nome.split(' ')[0]),s=h<13?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera',[frase,film]=fraseDelGiorno();
+  if(!_nuovoAccesso)return;_nuovoAccesso=false;
+  let n=0;try{const k='cc_frase_admin_'+currentUser.id;n=(+localStorage.getItem(k)||0)%FRASI_ADMIN.length;localStorage.setItem(k,String(n+1));}catch(e){}
+  const h=new Date().getHours(),nome=esc(currentUser.nome.split(' ')[0]),s=h<13?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera',[frase,film]=FRASI_ADMIN[n];
   apriModal(`<div style="text-align:center;padding:10px 0 4px"><div style="font-size:54px;line-height:1;margin-bottom:14px">${h<13?'☀️':h<18?'🔥':'🌙'}</div>
     <div style="font-size:26px;font-weight:800;letter-spacing:-.6px">${s}, ${nome}!</div>
     <div class="muted" style="font-size:14px;margin-top:8px">${labelGiornoLungo(oggiIso())}</div>
@@ -867,7 +869,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v3.6')}
+      ${riga('ti-info-circle','gray','Versione','v3.7')}
     </div>`;
 }
 
