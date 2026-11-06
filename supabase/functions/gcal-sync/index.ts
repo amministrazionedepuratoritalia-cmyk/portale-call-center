@@ -65,9 +65,8 @@ async function base() {
 const tipoDi = (c: string) => _tipi.find((t) => t.codice === c);
 const opDi = (id: number | null) => _ops.find((o) => o.id === id);
 const isApp = (c: string) => tipoDi(c)?.gruppo === "appuntamenti";
-// Colore dell'evento su Google = colore della fonte nel calendario del gestionale (Davide 06/11): blu CC → Pavone, ambra Stand → Mandarino,
-// indigo Internet → Mirtillo, verde Referenze → Basilico, grigio «non indicata» → Grafite
-const COLORI: Record<string, string> = { blue: "7", amber: "6", indigo: "9", green: "10", purple: "3", red: "11", pink: "4", gray: "8" };
+// Colori: l'ufficio colora gli eventi su Google con un suo schema (Basilico = fissato, Grafite = saltato/recall, Mirtillo = riconferma…):
+// il portale non impone colori agli eventi che crea e copia quelli di Google in cc_registrazioni.google_colore (Davide 06/11: «i colori come su Google»)
 
 // ── data/ora ──
 function addMin(data: string, ora: string, min: number) {
@@ -136,7 +135,7 @@ function eventoDa(r: any) {
   ].filter((x) => x !== "").join("\n");
   const ev: any = {
     summary: `${r.venditore ? "(" + r.venditore + ") " : ""}${zona}${sigla ? sigla + " - " : ""}${r.cliente || "Cliente non indicato"}${r.telefono ? " " + r.telefono : ""}`,
-    location: r.indirizzo || "", description: desc, colorId: COLORI[t?.colore || "blue"] || "9",
+    location: r.indirizzo || "", description: desc,   // niente colorId: il colore su Google lo mette l'ufficio (ha un suo significato) e il portale lo copia (google_colore)
     extendedProperties: { private: { cc_id: String(r.id) } },
   };
   if (r.ora_appuntamento) {
@@ -286,7 +285,7 @@ async function applica(ev: any, riga: any) {
   const durata = fine ? Math.max(15, Math.round((new Date(ev.end.dateTime).getTime() - new Date(ev.start.dateTime).getTime()) / 60000)) : (riga?.durata_min || 60);
   const desc = ev.description || "", sum = ev.summary || "", tit = daTitolo(sum);
   const cliente = sum.includes(" · ") ? sum.split(" · ")[0].trim() || null : tit.cliente;
-  const agg: any = { data_appuntamento: inizio.data, ora_appuntamento: inizio.ora, durata_min: durata, indirizzo: ev.location || null, zona: tit.zona, google_event_id: ev.id, google_sync_at: new Date().toISOString() };
+  const agg: any = { data_appuntamento: inizio.data, ora_appuntamento: inizio.ora, durata_min: durata, indirizzo: ev.location || null, zona: tit.zona, google_colore: ev.colorId || null, google_event_id: ev.id, google_sync_at: new Date().toISOString() };
   if (cliente && cliente !== "Cliente non indicato") agg.cliente = cliente;
   const tel = campo(desc, "Telefono") ?? tit.telefono, ven = campo(desc, "Venditore") ?? tit.venditore, note = noteDa(desc);
   if (tel !== null) agg.telefono = tel || null;
@@ -418,6 +417,31 @@ Deno.serve(async (req) => {
         if (!res.nextPageToken) break; pageToken = res.nextPageToken;
       }
       return Response.json({ ok: true, ripristinati: fatti.length, fatti, errori });
+    }
+    if (url.searchParams.get("mode") === "colori") {      // una tantum: quali colori usa l'ufficio su Google (da/a = YYYY-MM-DD); con &applica=1 li scrivo sulle righe già importate
+      const da = url.searchParams.get("da") || IMPORTA_DA || "2026-01-01", a = url.searchParams.get("a") || addDays(da, 366), applica = url.searchParams.get("applica") === "1";
+      const perColore: Record<string, string[]> = {}, esempi: Record<string, string[]> = {}; let pageToken: string | undefined, totale = 0;
+      do {
+        const q = new URLSearchParams({ singleEvents: "true", maxResults: "2500", timeMin: da + "T00:00:00Z", timeMax: a + "T00:00:00Z", fields: "nextPageToken,items(id,colorId,summary,status)" });
+        if (pageToken) q.set("pageToken", pageToken);
+        const res = await gapi("/events?" + q.toString());
+        for (const ev of res.items || []) { if (ev.status === "cancelled") continue; totale++; const c = ev.colorId || "nessuno"; (perColore[c] = perColore[c] || []).push(ev.id); if ((esempi[c] = esempi[c] || []).length < 4) esempi[c].push(ev.summary || ""); }
+        pageToken = res.nextPageToken;
+      } while (pageToken);
+      const conteggi: Record<string, number> = {}; for (const c in perColore) conteggi[c] = perColore[c].length;
+      let aggiornate = 0;
+      if (applica) for (const c in perColore) {
+        const ids = perColore[c], colore = c === "nessuno" ? null : c;
+        for (let i = 0; i < ids.length; i += 200) { const { count } = await sb.from("cc_registrazioni").update({ google_colore: colore, google_sync_at: new Date().toISOString() }, { count: "exact" }).in("google_event_id", ids.slice(i, i + 200)); aggiornate += count || 0; }
+      }
+      return Response.json({ ok: true, da, a, eventi: totale, conteggi, esempi, aggiornate });
+    }
+    if (url.searchParams.get("mode") === "colore") {      // una tantum: cambia/toglie il colore di un evento creato dal portale (solo se il creatore è il service account)
+      const gid = url.searchParams.get("gid") || "", colore = url.searchParams.get("colore") || null;
+      const ev = await gapi("/events/" + gid);
+      if ((ev.creator?.email || "") !== SA.client_email) return Response.json({ ok: false, errore: "non è un evento creato dal portale: non si tocca" }, { status: 400 });
+      const dopo = await gapi("/events/" + gid, "PATCH", { colorId: colore });
+      return Response.json({ ok: true, summary: dopo.summary, colorId: dopo.colorId || null });
     }
     if (url.searchParams.get("mode") === "unisci") {      // una tantum: stesso appuntamento nel portale (riga P) e scritto a mano su Google (riga G dal pull): resta P, collegata all'evento dell'ufficio; il nostro doppione su Google viene tolto
       const pid = Number(url.searchParams.get("portale")), gid = Number(url.searchParams.get("google"));

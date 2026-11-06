@@ -148,6 +148,9 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function hm(t){return t?String(t).slice(0,5):'';}
 // Titolo come su Google Calendar: (Consulente) TO ST - Cliente
 const SIGLE_FONTE={Stand:'ST',Internet:'INT',CC:'CC',Referenze:'RF'};
+const COLORI_GOOGLE={1:'#7986CB',2:'#33B679',3:'#8E24AA',4:'#E67C73',5:'#F6BF26',6:'#F4511E',7:'#039BE5',8:'#616161',9:'#3F51B5',10:'#0B8043',11:'#D50000'};
+function coloreEv(e){return COLORI_GOOGLE[e.google_colore]||COLORE_HEX[tipoDi(e.tipo_codice).colore]||COLORE_HEX.blue;}
+function testoSu(hex){const n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#1d1d1f':'#fff';}
 function titoloEv(e){const t=tipoDi(e.tipo_codice),sig=SIGLE_FONTE[t.fonte]||'';return [e.venditore?'('+e.venditore+')':'',e.zona==='P'?'TO':e.zona==='E'?'BO':'',sig?sig+' -':'',e.cliente||'Cliente n.i.'].filter(Boolean).join(' ');}
 function minuti(t){if(!t)return null;const[h,m]=String(t).split(':').map(Number);return h*60+m;}
 async function api(path){const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
@@ -169,7 +172,7 @@ async function carica(){
     tipi=t;operatrici=o;
     const cod=tipi.filter(x=>x.gruppo==='appuntamenti').map(x=>x.codice);
     [evs,pren]=cod.length?await Promise.all([
-      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${giorni[0]}&data_appuntamento=lte.${giorni[5]}&select=id,operatrice_id,tipo_codice,cliente,indirizzo,venditore,data_appuntamento,ora_appuntamento,durata_min,demo,zona&order=data_appuntamento,ora_appuntamento`),
+      api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data_appuntamento=gte.${giorni[0]}&data_appuntamento=lte.${giorni[5]}&select=id,operatrice_id,tipo_codice,cliente,indirizzo,venditore,data_appuntamento,ora_appuntamento,durata_min,demo,zona,google_colore&order=data_appuntamento,ora_appuntamento`),
       api(`cc_registrazioni?tipo_codice=in.(${cod.join(',')})&data=eq.${giornoFondo()}&solo_calendario=is.false&select=id,tipo_codice,cliente,data,data_appuntamento,ora_appuntamento,demo,zona&order=ora`)]):[[],[]];
     disegna();
     document.getElementById('agg').textContent='aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
@@ -202,7 +205,7 @@ function disegnaCalendario(){
   el.innerHTML=`<div class="cal-wh" style="border-left:none"></div>${giorni.map(g=>`<div class="cal-wh${g===oggiIso()?' today':''}"><div class="d">${GIORNI_BREVI[isoToDate(g).getDay()]}</div><div class="n">${isoToDate(g).getDate()}</div></div>`).join('')}
     <div class="cal-gutter" style="font-size:9px;text-align:right;padding:4px;border-bottom:0.5px solid var(--sep)">senza ora</div>${giorni.map(g=>`<div class="cal-allday">${(perG[g]||[]).filter(e=>!e.ora_appuntamento).map(e=>{const t=tipoDi(e.tipo_codice);return `<div class="ev bg-${t.colore}" style="border-left-color:${COLORE_HEX[t.colore]}">${esc(e.cliente||'Cliente n.i.')}</div>`;}).join('')}</div>`).join('')}
     <div class="cal-gutter" style="height:${hh*(CAL_H1-CAL_H0)}px">${ore.map(h=>`<div style="top:${(h-CAL_H0)*hh-6}px">${h}:00</div>`).join('')}</div>
-    ${giorni.map(g=>`<div class="cal-col${g===oggiIso()?' today':''}" style="height:${hh*(CAL_H1-CAL_H0)}px;background-size:100% ${hh}px">${layoutEv((perG[g]||[]).filter(e=>e.ora_appuntamento)).map(x=>{const e=x.e,t=tipoDi(e.tipo_codice),m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*hh/60),h=Math.max(20,(e.durata_min||60)*hh/60),o=opDi(e.operatrice_id);return `<div class="blk bg-${t.colore}${e.demo==='fatta'?' fatta':''}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(x.col*100/x.ncol).toFixed(2)}% + 2px);width:calc(${(100/x.ncol).toFixed(2)}% - 4px);border-left-color:${COLORE_HEX[t.colore]}"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b>${esc([t.fonte||t.nome,o.senza?'':o.nome.split(' ')[0]].filter(Boolean).join(' · '))}</div>`;}).join('')}${g===oggiIso()&&minOra>=CAL_H0*60&&minOra<=CAL_H1*60?`<div class="cal-now" style="top:${((minOra-CAL_H0*60)*hh/60).toFixed(0)}px"></div>`:''}</div>`).join('')}`;
+    ${giorni.map(g=>`<div class="cal-col${g===oggiIso()?' today':''}" style="height:${hh*(CAL_H1-CAL_H0)}px;background-size:100% ${hh}px">${layoutEv((perG[g]||[]).filter(e=>e.ora_appuntamento)).map(x=>{const e=x.e,t=tipoDi(e.tipo_codice),m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*hh/60),h=Math.max(20,(e.durata_min||60)*hh/60),o=opDi(e.operatrice_id);return `<div class="blk solido${e.demo==='fatta'?' fatta':''}" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(x.col*100/x.ncol).toFixed(2)}% + 2px);width:calc(${(100/x.ncol).toFixed(2)}% - 4px);background:${coloreEv(e)};color:${testoSu(coloreEv(e))};border-left-color:rgba(0,0,0,.28)"><b>${hm(e.ora_appuntamento)} ${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b>${esc([t.fonte||t.nome,o.senza?'':o.nome.split(' ')[0]].filter(Boolean).join(' · '))}</div>`;}).join('')}${g===oggiIso()&&minOra>=CAL_H0*60&&minOra<=CAL_H1*60?`<div class="cal-now" style="top:${((minOra-CAL_H0*60)*hh/60).toFixed(0)}px"></div>`:''}</div>`).join('')}`;
   // porta in vista l'ora corrente? il pannello non scorre: le ore 8–22 stanno nell'altezza del pannello
 }
 // ── lavagna ──
