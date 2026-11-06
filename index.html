@@ -276,12 +276,13 @@
       <div class="login-logo-wrap">
         <img src="logo.webp" alt="Depuratoritalia">
         <div class="login-title">Call Center</div>
-        <div class="login-sub">Seleziona il tuo nome e inserisci il PIN</div>
+        <div class="login-sub">Scrivi il tuo nome e inserisci il PIN</div>
       </div>
       <div class="login-card">
         <div id="login-error" class="alert alert-danger hidden"></div>
         <label style="margin-top:0">Chi sei?</label>
-        <select id="login-select"><option value="">— seleziona —</option></select>
+        <input id="login-nome" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Nome e cognome" enterkeyhint="next">
+        <div id="login-chi" class="muted" style="font-size:13px;margin-top:6px;min-height:18px"></div>
         <label style="margin-top:18px">PIN (4 cifre)</label>
         <div class="pin-input">
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p0">
@@ -290,7 +291,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.5 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.6 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -370,6 +371,7 @@
     <div class="tab" onclick="switchTab(this,'tab-appuntamenti');renderAppuntamenti()"><i class="ti ti-calendar-check"></i> Appuntamenti</div>
     <div class="tab" onclick="switchTab(this,'tab-registrazioni');renderRegistrazioni()"><i class="ti ti-list"></i> Registrazioni</div>
     <div class="tab" onclick="switchTab(this,'tab-gestione');renderGestione()"><i class="ti ti-settings"></i> Gestione</div>
+    <div class="tab hidden" id="tab-btn-sviluppatore" onclick="switchTab(this,'tab-sviluppatore');renderSviluppatore()"><i class="ti ti-code"></i> Sviluppatore</div>
   </div>
   <div class="page-content">
     <div id="tab-live"><div class="loading"><div class="spinner"></div>Carico…</div></div>
@@ -380,6 +382,7 @@
     <div id="tab-appuntamenti" class="hidden"></div>
     <div id="tab-registrazioni" class="hidden"></div>
     <div id="tab-gestione" class="hidden"></div>
+    <div id="tab-sviluppatore" class="hidden"></div>
   </div>
 </div>
 
@@ -438,6 +441,10 @@ const COLORI=['blue','green','amber','red','pink','purple','indigo','gray'];
 function tipoDi(codice){return tipi.find(t=>t.codice===codice)||{codice,nome:codice,icona:'ti-circle',colore:'gray'};}
 // Registrazioni senza telefonista (demo dirette dei consulenti / stand): contano sulla fonte, non su una persona
 const ZONE={P:'Piemonte',E:'Emilia-Romagna'};function zonaLabel(z){return ZONE[z]||'Lombardia';}
+// Ruoli: 'operatrice' (telefonista), 'admin', 'sviluppatore' (tutto quello che fa l'admin + scheda riservata; non compare a nessun altro)
+const RUOLI={operatrice:'Telefonista',admin:'Admin',sviluppatore:'Sviluppatore'};
+function isAdmin(o){return !!o&&(o.ruolo==='admin'||o.ruolo==='sviluppatore');}
+function isDev(o){return !!o&&o.ruolo==='sviluppatore';}
 function opDi(id){return (id!=null&&operatrici.find(o=>o.id===id))||{id,nome:'Senza telefonista',senza:true};}
 function tipiAttivi(){return tipi.filter(t=>t.attivo).sort((a,b)=>a.ordine-b.ordine||a.id-b.id);}
 // Attività visibili alla telefonista loggata (l'admin può nasconderne alcune da Gestione → Telefoniste)
@@ -453,11 +460,21 @@ function metricheGruppi(regs,extra=''){if(!haGruppi())return '';const c=contaGru
 // ── Avvio ──
 async function caricaBase(){
   [tipi,operatrici]=await Promise.all([api('cc_tipi?select=*&order=ordine,id'),api('cc_operatrici?select=id,nome,ruolo,attiva,ultimo_accesso,tipi_nascosti,squadra&order=nome')]);
-  const sel=document.getElementById('login-select');
-  sel.innerHTML='<option value="">— seleziona —</option>'+operatrici.filter(o=>o.attiva).map(o=>`<option value="${o.id}">${esc(o.nome)}</option>`).join('');
+}
+// Nome scritto a mano al login: parole senza accenti/maiuscole; ogni parola scritta deve essere una parola del nome
+// (o il suo inizio, da 3 lettere in su), in qualsiasi ordine: «Rossella», «Gatto Rossella», «ross gat» → Rossella Gatto
+function paroleNome(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split(/[^a-z]+/).filter(Boolean);}
+function cercaOperatrice(testo){
+  const p=paroleNome(testo);if(!p.length)return [];
+  const trovate=operatrici.filter(o=>o.attiva).filter(o=>{const w=paroleNome(o.nome);return p.every(x=>w.some(y=>y===x||(x.length>=3&&y.startsWith(x))));});
+  const esatte=trovate.filter(o=>paroleNome(o.nome).join(' ')===p.join(' '));
+  return esatte.length===1?esatte:trovate;
 }
 document.addEventListener('DOMContentLoaded',async()=>{
   // PIN: passa alla casella successiva da solo, Invio = Entra
+  const nomeEl=document.getElementById('login-nome');
+  nomeEl.addEventListener('input',()=>{const t=cercaOperatrice(nomeEl.value);document.getElementById('login-chi').textContent=t.length===1?'Entri come '+t[0].nome:t.length>1?'Più nomi simili: scrivi anche il cognome':'';});
+  nomeEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('p0').focus();}});
   ['p0','p1','p2','p3'].forEach((id,i)=>{
     const el=document.getElementById(id);
     el.addEventListener('input',()=>{el.value=el.value.replace(/\D/g,'').slice(-1);if(el.value&&i<3)document.getElementById('p'+(i+1)).focus();if(el.value&&i===3)doLogin();});
@@ -473,12 +490,17 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
 // ── Login / logout ──
 async function doLogin(){
-  const sel=document.getElementById('login-select');
-  if(!sel.value){showLoginError('Seleziona il tuo nome');return;}
+  const trovate=cercaOperatrice(document.getElementById('login-nome').value);
+  if(!trovate.length){showLoginError('Nome non trovato: scrivilo come è registrato nel portale');return;}
+  if(trovate.length>1){showLoginError('Ci sono più nomi simili: scrivi nome e cognome');return;}
+  const chi=trovate[0];
   const pin=['p0','p1','p2','p3'].map(id=>document.getElementById(id).value).join('');
   if(pin.length<4){showLoginError('Inserisci il PIN completo');return;}
   try{
-    const res=await api(`cc_operatrici?id=eq.${sel.value}&pin=eq.${encodeURIComponent(pin)}&attiva=eq.true&select=id,nome,ruolo,attiva,tipi_nascosti`);
+    const campi='select=id,nome,ruolo,attiva,tipi_nascosti';
+    let res=await api(`cc_operatrici?id=eq.${chi.id}&pin=eq.${encodeURIComponent(pin)}&attiva=eq.true&${campi}`);
+    // Account ancora senza PIN (es. appena creato): il primo PIN digitato diventa quello buono
+    if(!res.length){res=await api(`cc_operatrici?id=eq.${chi.id}&pin=is.null&attiva=eq.true&${campi}`,'PATCH',{pin});if(res.length)toast('PIN impostato: da ora entri con questo');}
     if(!res.length){showLoginError('PIN errato');['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');document.getElementById('p0').focus();return;}
     document.getElementById('login-error').classList.add('hidden');
     ['p0','p1','p2','p3'].forEach(id=>document.getElementById(id).value='');
@@ -489,7 +511,7 @@ async function doLogin(){
 async function entra(u){
   currentUser=u;
   api(`cc_operatrici?id=eq.${u.id}`,'PATCH',{ultimo_accesso:new Date().toISOString()}).catch(()=>{});
-  if(u.ruolo==='admin'){await avviaAdmin();}else{await avviaOperatrice();}
+  if(isAdmin(u)){await avviaAdmin();}else{await avviaOperatrice();}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.classList.remove('hidden');}
 async function doLogout(){
@@ -498,7 +520,7 @@ async function doLogout(){
   currentUser=null;turnoAperto=null;regOggi=[];
   clearInterval(_timerTurno);clearInterval(_timerPoll);
   if(_rt){try{_rt.unsubscribe();}catch(e){}_rt=null;}
-  document.getElementById('login-select').value='';
+  document.getElementById('login-nome').value='';document.getElementById('login-chi').textContent='';
   showScreen('login');
 }
 function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active');window.scrollTo(0,0);}
@@ -738,7 +760,7 @@ async function loadStoricoOp(){
 // ══════════════════════════════════════════════════════════════
 let _periodoMode='giorno';
 let _squadra='';   // '' = tutte le squadre
-function squadre(){return [...new Set(operatrici.filter(o=>o.ruolo!=='admin'&&o.squadra).map(o=>o.squadra))].sort();}
+function squadre(){return [...new Set(operatrici.filter(o=>!isAdmin(o)&&o.squadra).map(o=>o.squadra))].sort();}
 function inSquadra(id){return !_squadra||opDi(id).squadra===_squadra;}
 function filtraSquadra(d){return _squadra?{...d,cal:[],regs:d.regs.filter(r=>inSquadra(r.operatrice_id)),turni:d.turni.filter(t=>inSquadra(t.operatrice_id))}:d;}
 function setSquadra(q){_squadra=q;onPeriodoChange();}
@@ -797,7 +819,8 @@ async function datiPeriodo(p){
 }
 function invalidaCache(){Object.keys(_cache).forEach(k=>delete _cache[k]);_trendRegs={};}
 async function avviaAdmin(){
-  document.getElementById('admin-name').textContent=currentUser.nome;
+  document.getElementById('admin-name').textContent=currentUser.nome+(isDev(currentUser)?' · sviluppatore':'');
+  document.getElementById('tab-btn-sviluppatore').classList.toggle('hidden',!isDev(currentUser));
   document.getElementById('admin-giorno').value=oggiIso();document.getElementById('admin-giorno').max=oggiIso();
   popolaMesi('admin-mese');popolaSettimane();aggiornaFrecce();
   resetTabs('admin');showScreen('admin');
@@ -809,12 +832,51 @@ async function avviaAdmin(){
 }
 function nomeOp(id){return esc(opDi(id).nome);}
 
+// ── SVILUPPATORE: scheda riservata al ruolo 'sviluppatore' (account admin, stato del collegamento Google) ──
+async function conta(path){const r=await fetch(SUPABASE_URL+'/rest/v1/'+path,{method:'HEAD',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'count=exact'}});return +((r.headers.get('content-range')||'').split('/')[1]||0);}
+async function renderSviluppatore(){
+  const el=document.getElementById('tab-sviluppatore');
+  if(!isDev(currentUser)){el.innerHTML='';return;}
+  el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
+  const anno=oggiIso().slice(0,4);let stato=[],nGoogle='?',nSenza='?',nPortale='?';
+  try{[stato,nGoogle,nSenza,nPortale]=await Promise.all([
+    api('cc_sync_state?select=k,v,updated_at&k=in.(GCAL_CALENDAR_ID,GCAL_IMPORTATO_IL,GCAL_IMPORTA_DA,GCAL_SCRIVI,syncToken,pullPageToken,pullLock)'),
+    conta(`cc_registrazioni?select=id&origine=eq.google&data=gte.${anno}-01-01`),
+    conta(`cc_registrazioni?select=id&origine=eq.google&data=gte.${anno}-01-01&operatrice_id=is.null`),
+    conta(`cc_registrazioni?select=id&origine=eq.portale&data=gte.${anno}-01-01`)]);}catch(e){}
+  const st=k=>stato.find(r=>r.k===k),v=k=>st(k)?.v||'';
+  const quando=ts=>ts?labelGiorno(ts.slice(0,10))+' '+hhmm(ts):'mai';
+  const riga=(ic,col,titolo,sotto)=>`<div class="row"><div class="row-ic bg-${col} c-${col}"><i class="ti ${ic}"></i></div><div class="row-body"><div class="row-title">${titolo}</div><div class="row-sub" style="white-space:normal">${sotto}</div></div></div>`;
+  const lettura=v('pullPageToken')?'lettura completa in corso':v('pullLock')?'in corso adesso':'a riposo, riparte ogni minuto';
+  const base=location.href.replace(/[^/]*$/,'');
+  el.innerHTML=`
+    <div class="alert alert-info" style="margin:0 4px 12px">Scheda riservata al tuo account: nessun altro la vede. Qui stanno le funzioni che hai solo tu.</div>
+    <div class="flex between" style="margin-bottom:10px"><span class="muted">Account con accesso completo. Gli admin possono gestire solo le telefoniste.</span><button class="btn btn-primary btn-sm" onclick="apriOperatrice(null,'admin')"><i class="ti ti-plus"></i> Aggiungi admin</button></div>
+    <div class="card card-flush" style="margin-bottom:18px">${righeAccount(operatrici.filter(o=>isAdmin(o)))}</div>
+    <div class="flex between" style="margin-bottom:10px"><span class="muted">Collegamento con Google Calendar (sola lettura: il portale non scrive mai su Google).</span></div>
+    <div class="card card-flush" style="margin-bottom:18px">
+      ${riga('ti-calendar','blue','Calendario collegato',esc(v('GCAL_CALENDAR_ID')||'nessuno'))}
+      ${riga('ti-refresh','green','Lettura da Google',`Ultima: <b>${quando(st('syncToken')?.updated_at)}</b> · ${lettura}`)}
+      ${riga('ti-pencil-off',v('GCAL_SCRIVI')==='1'?'red':'gray','Scrittura su Google',v('GCAL_SCRIVI')==='1'?'<b>ACCESA</b>':'spenta: il portale legge e basta')}
+      ${riga('ti-calendar-stats','indigo','Eventi di quest\'anno',`<b>${nGoogle}</b> arrivati da Google (<b>${nSenza}</b> senza telefonista riconosciuta) · <b>${nPortale}</b> registrati nel portale`)}
+      ${riga('ti-flag','amber','Regole',`Contano gli eventi creati su Google dal <b>${v('GCAL_IMPORTATO_IL')?labelGiorno(v('GCAL_IMPORTATO_IL').slice(0,10)):'?'}</b> in poi (i precedenti sono «solo calendario») · importati dal <b>${ddmmyyyy(v('GCAL_IMPORTA_DA'))||'?'}</b>`)}
+    </div>
+    <div class="flex between" style="margin-bottom:10px"><span class="muted">Collegamenti</span></div>
+    <div class="card card-flush">
+      ${riga('ti-device-tv','purple',`<a href="${base}tv.html" target="_blank">Lavagna per la TV</a>`,'tv.html')}
+      ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
+      ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
+      ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
+      ${riga('ti-info-circle','gray','Versione','v3.6')}
+    </div>`;
+}
+
 // ── ADESSO (sempre oggi, in tempo reale) ──
 async function renderLive(evidenzia){
   const el=document.getElementById('tab-live');
   const oggi=oggiIso(),p={start:oggi,end:oggi};
   let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi(),ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva&&inSquadra(o.id));
+  const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi(),ops=operatrici.filter(o=>!isAdmin(o)&&o.attiva&&inSquadra(o.id));
   const aperti=d.turni.filter(t=>!t.fine);
   const ultimaDi={};d.regs.forEach(r=>{if(!ultimaDi[r.operatrice_id]||r.ora>ultimaDi[r.operatrice_id])ultimaDi[r.operatrice_id]=r.ora;});
   const stato=o=>{const t=aperti.find(x=>x.operatrice_id===o.id);if(!t)return{cls:'gray',txt:'fuori turno',turno:null};const u=ultimaDi[o.id];const fermaDa=u?(Date.now()-new Date(u))/60000:(Date.now()-new Date(t.inizio))/60000;return fermaDa>MINUTI_INATTIVITA?{cls:'amber',txt:'ferma da '+Math.round(fermaDa)+' min',turno:t}:{cls:'green',txt:'attiva',turno:t};};
@@ -849,7 +911,7 @@ async function renderOperatrici(){
   el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
   let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const ta=tipiAttivi(),cols=colonneCompatte(ta),G=haGruppi();
-  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
+  const ops=operatrici.filter(o=>!isAdmin(o)&&inSquadra(o.id)&&(o.attiva||d.regs.some(r=>r.operatrice_id===o.id)));
   const regsDi={};d.regs.forEach(r=>(regsDi[r.operatrice_id]=regsDi[r.operatrice_id]||[]).push(r));
   const oreOp={},giorniOp={};
   d.regs.forEach(r=>(giorniOp[r.operatrice_id]=giorniOp[r.operatrice_id]||new Set()).add(r.data));
@@ -986,7 +1048,7 @@ async function renderRegistrazioni(){
   let d;try{d=filtraSquadra(await datiPeriodo(p));}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const regs=d.regs.filter(r=>(!_fOp||r.operatrice_id===+_fOp)&&(!_fTipo||r.tipo_codice===_fTipo));
   el.innerHTML=`${barraSquadre()}<div class="flex wrap" style="margin-bottom:12px">
-      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le telefoniste</option>${operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
+      <select style="width:auto;flex:1;min-width:140px" onchange="_fOp=this.value;renderRegistrazioni()"><option value="">Tutte le telefoniste</option>${operatrici.filter(o=>!isAdmin(o)&&inSquadra(o.id)).map(o=>`<option value="${o.id}" ${_fOp==o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>
       <select style="width:auto;flex:1;min-width:140px" onchange="_fTipo=this.value;renderRegistrazioni()"><option value="">Tutte le attività</option>${tipi.map(t=>`<option value="${t.codice}" ${_fTipo===t.codice?'selected':''}>${esc(t.nome)}</option>`).join('')}</select>
       <button class="btn btn-sm" onclick="esportaExcel()"><i class="ti ti-download"></i> Excel</button>
       <button class="btn btn-primary btn-sm" onclick="apriInserimento()"><i class="ti ti-plus"></i> Inserisci dati passati</button></div>
@@ -997,7 +1059,7 @@ async function renderRegistrazioni(){
 }
 // Inserimento manuale dell'admin: i numeri di un giorno passato per una telefonista (es. la settimana prima del portale)
 function apriInserimento(){
-  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&o.attiva),ta=tipiAttivi(),fonti=fontiDi(ta);
+  const ops=operatrici.filter(o=>!isAdmin(o)&&o.attiva),ta=tipiAttivi(),fonti=fontiDi(ta);
   const p=periodoCorrente(),giorno=p.mode==='giorno'?p.start:(p.end<oggiIso()?p.end:oggiIso());
   const campo=t=>`<div class="flex between" style="padding:6px 0"><span style="font-size:14px">${esc(t.gruppo==='contatti'?'Contatti':t.gruppo==='appuntamenti'?'Appuntamenti presi':t.nome)}</span><input type="number" min="0" class="ins-n" data-codice="${t.codice}" value="0" style="width:90px;text-align:center;padding:8px"></div>`;
   apriModal(`<h2>Inserisci dati passati</h2><div class="muted">Totali di un giorno per una telefonista. Compaiono nelle statistiche come registrazioni di quel giorno (ore 12:00).</div>
@@ -1047,7 +1109,7 @@ async function esportaExcel(){
   regs.forEach(r=>righe.push([ddmmyyyy(r.data),hhmm(r.ora),opDi(r.operatrice_id).nome,tipoDi(r.tipo_codice).nome,r.cliente,r.telefono,ddmmyyyy(r.data_appuntamento),isApp(r)?(r.demo==='fatta'?'fatta':r.demo==='non_fatta'?'non fatta':'da fare'):'',r.note].map(q).join(';')));
   const G=haGruppi();
   righe.push('');righe.push(['Riepilogo per telefonista','Squadra',...ta.map(t=>t.nome),...(G?['Contatti totali','Appuntamenti totali','Resa %','Demo fatte']:[]),'Ore in turno'].map(q).join(';'));
-  operatrici.filter(o=>o.ruolo!=='admin'&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti')),contaDemo(mie).fatte]:[]),ore(h)].map(q).join(';'));});
+  operatrici.filter(o=>!isAdmin(o)&&inSquadra(o.id)).forEach(o=>{const mie=regs.filter(r=>r.operatrice_id===o.id);if(!mie.length&&!d.turni.some(t=>t.operatrice_id===o.id))return;const h=d.turni.filter(t=>t.operatrice_id===o.id).reduce((a,t)=>a+(new Date(t.fine||Date.now())-new Date(t.inizio)),0);righe.push([o.nome,o.squadra||'',...ta.map(t=>mie.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(mie,'contatti'),contaGruppo(mie,'appuntamenti'),pct(contaGruppo(mie,'appuntamenti'),contaGruppo(mie,'contatti')),contaDemo(mie).fatte]:[]),ore(h)].map(q).join(';'));});
   const senza=regs.filter(r=>r.operatrice_id==null);
   if(senza.length)righe.push(['Senza telefonista (dirette)','',...ta.map(t=>senza.filter(r=>r.tipo_codice===t.codice).length),...(G?[contaGruppo(senza,'contatti'),contaGruppo(senza,'appuntamenti'),pct(contaGruppo(senza,'appuntamenti'),contaGruppo(senza,'contatti')),contaDemo(senza).fatte]:[]),''].map(q).join(';'));
   const blob=new Blob(['﻿'+righe.join('\r\n')],{type:'text/csv;charset=utf-8'});
@@ -1062,7 +1124,7 @@ async function renderGestione(){
   let corpo='';
   if(_gest==='operatrici'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">Chi può entrare nel portale. Il PIN lo decidi tu.</span><button class="btn btn-primary btn-sm" onclick="apriOperatrice()"><i class="ti ti-plus"></i> Aggiungi</button></div>
-      <div class="card card-flush">${operatrici.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.squadra?`<span class="pill bg-indigo c-indigo">${esc(o.squadra)}</span>`:''}${o.ruolo==='admin'?'<span class="pill bg-purple c-purple">admin</span>':''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}${o.ruolo!=='admin'?' · vede: '+descriviVisibili(o):''}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')}</div>`;
+      <div class="card card-flush">${righeAccount(operatrici.filter(o=>o.ruolo==='operatrice'))}</div>`;
   }else if(_gest==='attivita'){
     corpo=`<div class="flex between" style="margin-bottom:10px"><span class="muted">I pulsanti che vedono le operatrici. La prima è quella base (es. Chiamate).</span><button class="btn btn-primary btn-sm" onclick="apriTipo()"><i class="ti ti-plus"></i> Aggiungi</button></div>
       <div class="card card-flush">${tipi.map((t,i)=>`<div class="row"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ${t.icona}"></i></div><div class="row-body"><div class="row-title">${esc(t.nome)} ${t.fonte?`<span class="pill bg-gray c-gray">${esc(t.fonte)}</span>`:''}${t.gruppo?`<span class="pill bg-${t.gruppo==='contatti'?'blue':'green'} c-${t.gruppo==='contatti'?'blue':'green'}">${GRUPPI[t.gruppo]||esc(t.gruppo)}</span>`:''}${!t.attivo?'<span class="pill bg-gray c-gray">nascosta</span>':''}${t.chiede_dettaglio?'<span class="pill bg-blue c-blue">con dettagli</span>':''}${t.obiettivo_giorno?`<span class="pill bg-green c-green">obiettivo ${t.obiettivo_giorno}/g</span>`:''}</div><div class="row-sub">${esc(t.descrizione||'')}</div></div>
@@ -1076,6 +1138,9 @@ async function renderGestione(){
   el.innerHTML=`<div class="seg seg-full"><button class="${_gest==='operatrici'?'on':''}" onclick="_gest='operatrici';renderGestione()">Telefoniste</button><button class="${_gest==='attivita'?'on':''}" onclick="_gest='attivita';renderGestione()">Attività</button><button class="${_gest==='avvisi'?'on':''}" onclick="_gest='avvisi';renderGestione()">Avvisi</button></div>${corpo}`;
 }
 // Fonti e attività singole (senza fonte) che la telefonista vede, in base a tipi_nascosti
+function righeAccount(lista){
+  return lista.map(o=>`<div class="row"><span class="avatar">${iniziali(o.nome)}</span><div class="row-body"><div class="row-title">${esc(o.nome)} ${o.squadra?`<span class="pill bg-indigo c-indigo">${esc(o.squadra)}</span>`:''}${isAdmin(o)?`<span class="pill bg-purple c-purple">${RUOLI[o.ruolo]}</span>`:''}${!o.attiva?'<span class="pill bg-gray c-gray">disattivata</span>':''}</div><div class="row-sub">Ultimo accesso: ${o.ultimo_accesso?labelGiorno(o.ultimo_accesso.slice(0,10))+' '+hhmm(o.ultimo_accesso):'mai'}${!isAdmin(o)?' · vede: '+descriviVisibili(o):''}</div></div><button class="btn btn-sm" onclick="apriOperatrice(${o.id})"><i class="ti ti-pencil"></i> Modifica</button></div>`).join('')||'<div class="empty">Nessuno.</div>';
+}
 function descriviVisibili(o){
   const n=o.tipi_nascosti||[],ta=tipiAttivi();
   const fonti=fontiDi(ta).filter(f=>ta.some(t=>t.fonte===f&&!n.includes(t.codice)));
@@ -1083,20 +1148,21 @@ function descriviVisibili(o){
   const tutte=[...fonti,...singole];
   return tutte.length===0?'niente':(n.length===0?'tutto':tutte.join(', '));
 }
-function apriOperatrice(id){
-  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:'operatrice',attiva:true,tipi_nascosti:[],squadra:''};
+function apriOperatrice(id,ruoloNuovo='operatrice'){
+  const o=id?operatrici.find(x=>x.id===id):{nome:'',ruolo:ruoloNuovo,attiva:true,tipi_nascosti:[],squadra:''};
+  const mio=!!id&&id===currentUser?.id;   // il proprio account: ruolo bloccato, niente Elimina
   const sqOpzioni=[...new Set(['Mattino','Pomeriggio',...squadre()])];
   const n=o.tipi_nascosti||[],ta=tipiAttivi();
   const spunte=fontiDi(ta).map(f=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${ta.filter(t=>t.fonte===f).map(t=>t.codice).join(',')}" ${ta.filter(t=>t.fonte===f).every(t=>n.includes(t.codice))?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(f)}</span></label>`).join('')
     +ta.filter(t=>!t.fonte).map(t=>`<label class="flex" style="margin-top:8px"><input type="checkbox" class="g-vede" data-codici="${t.codice}" ${n.includes(t.codice)?'':'checked'} style="width:18px"> <span style="font-weight:400;color:var(--text)">${esc(t.nome)}</span></label>`).join('');
-  apriModal(`<h2>${id?'Modifica':'Nuova telefonista'}</h2>
+  apriModal(`<h2>${id?'Modifica':ruoloNuovo==='admin'?'Nuovo admin':'Nuova telefonista'}</h2>
     <label>Nome</label><input id="g-nome" value="${esc(o.nome)}" placeholder="Nome e cognome">
     <label>PIN (4 cifre)${id?' — lascia vuoto per non cambiarlo':''}</label><input id="g-pin" inputmode="numeric" maxlength="4" placeholder="••••">
-    <label>Ruolo</label><select id="g-ruolo" onchange="document.getElementById('g-vede-box').classList.toggle('hidden',this.value==='admin')"><option value="operatrice" ${o.ruolo!=='admin'?'selected':''}>Telefonista</option><option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option></select>
+    <label>Ruolo</label>${mio?`<input value="${RUOLI[o.ruolo]}" disabled><input type="hidden" id="g-ruolo" value="${o.ruolo}">`:`<select id="g-ruolo" onchange="document.getElementById('g-vede-box').classList.toggle('hidden',this.value!=='operatrice')"><option value="operatrice" ${o.ruolo==='operatrice'?'selected':''}>Telefonista</option>${isDev(currentUser)?`<option value="admin" ${o.ruolo==='admin'?'selected':''}>Admin</option>`:''}</select>`}
     <label>Squadra</label><input id="g-squadra" value="${esc(o.squadra||'')}" placeholder="es. Mattino o Pomeriggio" list="squadre-list"><datalist id="squadre-list">${sqOpzioni.map(q=>`<option value="${esc(q)}">`).join('')}</datalist>
     <label class="flex" style="margin-top:16px"><input type="checkbox" id="g-attiva" ${o.attiva?'checked':''} style="width:18px"> <span style="font-weight:400;color:var(--text)">Attiva (può entrare)</span></label>
-    <div id="g-vede-box" ${o.ruolo==='admin'?'class="hidden"':''}><label>Cosa vede e può registrare</label>${spunte||'<div class="muted">Nessuna attività configurata.</div>'}</div>
-    <div class="modal-actions">${id?`<button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="eliminaOperatrice(${id})">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaOperatrice(${id||'null'})">Salva</button></div>`);
+    <div id="g-vede-box" ${o.ruolo!=='operatrice'?'class="hidden"':''}><label>Cosa vede e può registrare</label>${spunte||'<div class="muted">Nessuna attività configurata.</div>'}</div>
+    <div class="modal-actions">${id&&!mio?`<button class="btn btn-danger btn-sm" style="margin-right:auto" onclick="eliminaOperatrice(${id})">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaOperatrice(${id||'null'})">Salva</button></div>`);
 }
 async function salvaOperatrice(id){
   const nome=document.getElementById('g-nome').value.trim(),pin=document.getElementById('g-pin').value.trim();
@@ -1104,10 +1170,14 @@ async function salvaOperatrice(id){
   if((!id&&!/^\d{4}$/.test(pin))||(pin&&!/^\d{4}$/.test(pin)))return toast('Il PIN deve avere 4 cifre');
   const nascosti=[...document.querySelectorAll('.g-vede')].filter(c=>!c.checked).flatMap(c=>c.dataset.codici.split(','));
   const body={nome,ruolo:document.getElementById('g-ruolo').value,attiva:document.getElementById('g-attiva').checked,tipi_nascosti:nascosti,squadra:document.getElementById('g-squadra').value.trim()||null};if(pin)body.pin=pin;
-  try{if(id)await api(`cc_operatrici?id=eq.${id}`,'PATCH',body);else await api('cc_operatrici','POST',body);chiudiModal();await caricaBase();renderGestione();toast('Salvato');}
+  if(body.ruolo!=='operatrice'&&!isDev(currentUser))return toast('Solo lo sviluppatore può creare o modificare gli admin');
+  try{if(id)await api(`cc_operatrici?id=eq.${id}`,'PATCH',body);else await api('cc_operatrici','POST',body);chiudiModal();await caricaBase();
+    if(id===currentUser?.id){currentUser.nome=nome;document.getElementById('admin-name').textContent=nome+(isDev(currentUser)?' · sviluppatore':'');}
+    renderGestione();if(isDev(currentUser))renderSviluppatore();toast('Salvato');}
   catch(e){toast('Errore: '+e.message);}
 }
 async function eliminaOperatrice(id){
+  if(id===currentUser?.id)return toast('Non puoi eliminare il tuo account');
   if(!confirm('Eliminare questa telefonista? Spariscono anche tutte le sue registrazioni. Se vuoi solo bloccarle l\'accesso, togli la spunta "Attiva".'))return;
   try{await api(`cc_operatrici?id=eq.${id}`,'DELETE');chiudiModal();await caricaBase();invalidaCache();renderGestione();}catch(e){toast('Errore: '+e.message);}
 }
@@ -1233,10 +1303,10 @@ function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarg
 function apriEvento(id,data,ora){
   const e=id?(_calEvs.find(x=>x.id===id)||Object.values(_cache).flatMap(c=>c.regs.concat(c.cal||[])).find(x=>x.id===id)):null;
   if(id&&!e){api(`cc_registrazioni?id=eq.${id}&select=*`).then(r=>{if(r[0]){_calEvs.push(r[0]);apriEvento(id,data,ora);}else toast('Appuntamento non trovato');}).catch(x=>toast('Errore: '+x.message));return;}   // non in memoria (es. dalla scheda Lavagna): lo carico
-  const ro=!_calEdit&&currentUser?.ruolo!=='admin';
+  const ro=!_calEdit&&!isAdmin(currentUser);
   const appTipi=tipiAttivi().filter(t=>t.gruppo==='appuntamenti');
   if(e&&!appTipi.some(t=>t.codice===e.tipo_codice)&&tipoDi(e.tipo_codice).gruppo==='appuntamenti')appTipi.push(tipoDi(e.tipo_codice));   // es. «Non indicata» (arrivato da Google)
-  const ops=operatrici.filter(o=>o.ruolo!=='admin'&&(o.attiva||(e&&o.id===e.operatrice_id)));
+  const ops=operatrici.filter(o=>!isAdmin(o)&&(o.attiva||(e&&o.id===e.operatrice_id)));
   const venditori=[...new Set(_calEvs.map(x=>x.venditore).filter(Boolean))].sort();
   const v=e||{cliente:'',telefono:'',indirizzo:'',data_appuntamento:data||oggiIso(),ora_appuntamento:ora||'',durata_min:60,tipo_codice:appTipi[0]?.codice,operatrice_id:null,venditore:'',zona:'',note:''};
   if(e&&data&&!e.data_appuntamento)v.data_appuntamento=data;
