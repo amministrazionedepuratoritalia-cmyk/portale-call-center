@@ -290,7 +290,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.3 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v3.4 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -1270,13 +1270,15 @@ async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PA
 
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
 let _lavSett=null;
+// la lavagna (tv.html dentro l'iframe) comunica la sua altezza: l'iframe si adatta, niente tagli né doppie barre di scorrimento
+window.addEventListener('message',e=>{if(e.data&&e.data.lavagnaAltezza)document.querySelectorAll('iframe[title="Lavagna"]').forEach(f=>{f.style.height=Math.max(300,e.data.lavagnaAltezza+8)+'px';});});
 // Lavagna per le telefoniste: la stessa della TV, in sola lettura (niente caselle modificabili, niente elenco senza fonte)
 let _lavSettOp=null;
 function renderLavagnaOp(){
   const el=document.getElementById('op-tab-lav');if(!_lavSettOp)_lavSettOp=lunediDi(oggiIso());
   el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSettOp=lunediDi(oggiIso());renderLavagnaOp()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSettOp=isoAddDays(_lavSettOp,-7);renderLavagnaOp()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSettOp=isoAddDays(_lavSettOp,7);renderLavagnaOp()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSettOp)}</div></div>
     <div class="muted" style="padding:0 4px 8px">La lavagna dell'ufficio, come sulla TV: nei giorni gli appuntamenti fissati (colore della fonte; P. = Piemonte, E. = Emilia-Romagna), in fondo gli appuntamenti presi nella settimana (nero = settimana in corso, rosso = settimana successiva). Si aggiorna da sola.</div>
-    <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSettOp}" style="width:100%;height:calc(100vh - 230px);min-height:560px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+    <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSettOp}" style="width:100%;height:600px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
 }
 async function caselleLavagna(codice,delta){const t=tipoDi(codice),n=Math.max(10,(t.caselle_lavagna||20)+delta);try{await api(`cc_tipi?codice=eq.${codice}`,'PATCH',{caselle_lavagna:n});t.caselle_lavagna=n;renderLavagna();toast(`${t.fonte}: ${n} caselle in fondo`);}catch(e){toast('Errore: '+e.message);}}
 async function renderLavagna(){
@@ -1288,7 +1290,7 @@ async function renderLavagna(){
     <div class="muted" style="padding:0 4px 6px">Sulla TV apri «Lavagna per la TV» a schermo intero (F11): mostra solo la lavagna. Il calendario della settimana a blocchi è una pagina a parte. Si aggiorna da sola. Nei giorni: gli appuntamenti fissati, col colore della fonte (P. = Piemonte, E. = Emilia-Romagna). In fondo: gli appuntamenti presi nella settimana per fonte, caselle vuote che si riempiono di <b>nero</b> (appuntamento nella settimana in corso, oppure preso venerdì per il lunedì dopo) o di <b>rosso</b> (settimana successiva).</div>
     ${senzaFonte.length?`<div class="alert alert-info" style="margin:0 4px 10px"><b>${senzaFonte.length} appuntament${senzaFonte.length===1?'o':'i'} senza fonte</b> presi questa settimana (non compaiono nelle caselle in fondo): ${senzaFonte.slice(0,8).map(r=>`<a href="#" onclick="event.preventDefault();apriEvento(${r.id})">${esc(r.cliente||'Cliente n.i.')}</a>`).join(', ')}${senzaFonte.length>8?' …':''}. Aprili e scegli la fonte.</div>`:''}
     <div class="flex wrap" style="gap:8px;padding:0 4px 10px;align-items:center"><span class="muted">Caselle in fondo:</span>${tipiAttivi().filter(t=>t.gruppo==='appuntamenti'&&t.fonte).map(t=>`<span class="pill bg-${t.colore} c-${t.colore}" style="gap:6px">${esc(t.fonte)} <b>${t.caselle_lavagna||20}</b> <button class="btn btn-xs" title="Togli 10 caselle" onclick="caselleLavagna('${t.codice}',-10)">−10</button><button class="btn btn-xs" title="Aggiungi 10 caselle" onclick="caselleLavagna('${t.codice}',10)">+10</button></span>`).join('')}</div>
-    <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSett}" style="width:100%;height:calc(100vh - 230px);min-height:560px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+    <iframe src="tv.html?vista=lavagna&embed=1&settimana=${_lavSett}" style="width:100%;height:600px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
 }
 
 // ── Modal / toast ──

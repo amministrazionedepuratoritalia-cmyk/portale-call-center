@@ -74,6 +74,28 @@
     .tot .casella.piena { color:#fff; }
     .vuoto { color:var(--text3); font-size:14px; padding:20px; text-align:center; }
     @media(max-width:1100px){ .tv { grid-template-columns:1fr; grid-template-rows:64px 1fr 1fr; } }
+    /* adattiva: se la lavagna non ci sta nello schermo (portatile, tablet, dentro al portale) la pagina scorre invece di tagliare */
+    body.scorri { overflow:auto; }
+    body.scorri .tv { height:auto; min-height:100vh; }
+    body.scorri .pannello { overflow:visible; }
+    body.scorri .lav { grid-template-rows:auto repeat(4,auto) auto; }
+    body.scorri .lav .cella { overflow:visible; }
+    body.scorri .cal { min-height:72vh; }
+    .casella { min-width:14px; min-height:14px; }
+    /* telefono: un giorno sotto l'altro, caselle di misura fissa */
+    .lav-m { flex:1; display:flex; flex-direction:column; gap:10px; }
+    .lav-m .giorno-m { border:2px solid #222; border-radius:10px; background:#fff; overflow:hidden; }
+    .lav-m .giorno-m.today { border-color:#0071E3; box-shadow:0 0 0 2px #0071E333; }
+    .lav-m .giorno-m > h3 { background:#F3F0FA; color:#5B2A86; font-size:16px; font-weight:800; text-transform:uppercase; padding:6px 10px; display:flex; justify-content:space-between; }
+    .lav-m .giorno-m > h3 small { font-size:13px; font-weight:700; text-transform:none; }
+    .lav-m .fascia-m { display:grid; grid-template-columns:60px 1fr; gap:8px; padding:7px 10px; border-top:1px solid #ddd; align-items:start; }
+    .lav-m .fascia-m .lbl { font-weight:800; color:#5B2A86; font-size:13px; line-height:1.15; }
+    .caselle-m { display:flex; flex-wrap:wrap; gap:4px; }
+    .caselle-m .casella { width:24px; height:24px; aspect-ratio:auto; font-size:14px; }
+    .lav-m .pe { margin-top:5px; flex-wrap:wrap; }
+    .lav-m .tot-m { border:2px solid #222; border-radius:10px; background:#fff; padding:8px 10px; display:flex; flex-direction:column; gap:10px; }
+    .lav-m .tot-m .lbl { font-weight:800; font-size:14px; margin-bottom:4px; }
+    .lav-m .tot-m .lbl small { font-weight:600; color:#666; margin-left:6px; }
   </style>
 </head>
 <body>
@@ -105,7 +127,8 @@ const q=new URLSearchParams(location.search), vista=q.get('vista')||'lavagna';  
 if(vista==='calendario')document.getElementById('pan-lav').remove();
 if(vista==='lavagna')document.getElementById('pan-cal').remove();
 if(vista!=='entrambi')document.getElementById('tv').classList.add('solo');
-if(q.get('embed')){document.querySelector('.top').style.display='none';document.getElementById('tv').style.gridTemplateRows='1fr';document.getElementById('tv').style.padding='0';}
+const EMBED=!!q.get('embed');
+if(EMBED){document.querySelector('.top').style.display='none';document.getElementById('tv').style.gridTemplateRows='1fr';document.getElementById('tv').style.padding='0';document.getElementById('tv').style.minHeight='0';document.body.classList.add('scorri');}
 
 function yyyymmdd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function oggiIso(){return yyyymmdd(new Date());}
@@ -146,6 +169,7 @@ function disegna(){
   const l1=document.getElementById('leg1');if(l1)l1.innerHTML=legenda();const l2=document.getElementById('leg2');if(l2)l2.innerHTML=legendaLav();
   if(document.getElementById('cal'))disegnaCalendario();
   if(document.getElementById('lav'))disegnaLavagna();
+  if(EMBED)setTimeout(()=>{try{parent.postMessage({lavagnaAltezza:document.documentElement.scrollHeight},'*');}catch(e){}},60);
 }
 // ── calendario settimana (lun–sab) ──
 function layoutEv(lista){
@@ -179,26 +203,40 @@ function colorePreso(e){if(!e.data_appuntamento||!e.data)return NERO;const lp=lu
 const ggmm=iso=>iso?iso.split('-').reverse().slice(0,2).join('/'):'';
 function box(e,colore,cls){const t=tipoDi(e.tipo_codice);return `<div class="${cls||'casella'} piena${e.demo==='fatta'?' fatta':''}" style="background:${colore};border-color:${colore}" title="${esc((e.cliente||'')+' · '+(t.fonte||t.nome)+(e.zona?' · '+ZONE[e.zona]:'')+(e.data_appuntamento?' · '+ggmm(e.data_appuntamento):'')+(e.ora_appuntamento?' '+hm(e.ora_appuntamento):''))}">${e.demo==='fatta'?'✓':''}</div>`;}
 function vuote(n,cls){return n>0?Array(n).fill(`<div class="${cls||'casella'}"></div>`).join(''):'';}
+function gruppiFondo(){
+  // in fondo solo le fonti vere (CC, Internet, Stand, Referenze): gli appuntamenti senza fonte restano nei giorni (grigi) finché l'ufficio non la mette
+  const fonti=[...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&t.attivo&&t.fonte).map(t=>t.fonte))];
+  const sigla=f=>({'CC':'C.C.','Stand':'ST.','Internet':'INTERNET','Referenze':'R.F.'})[f]||f.toUpperCase();
+  return fonti.map(f=>{const t=tipi.find(y=>y.gruppo==='appuntamenti'&&(y.fonte||y.nome)===f)||tipi.find(y=>(y.fonte||y.nome)===f),lista=pren.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length,base=t.caselle_lavagna||20,n=Math.max(base,Math.ceil(lista.length/10)*10);return {f,t,lista,fatte,base,n,sigla:sigla(f)};});
+}
+function cellaFascia(lista,cls){
+  const L=lista.filter(e=>!e.zona),P=lista.filter(e=>e.zona==='P'),E=lista.filter(e=>e.zona==='E');
+  return `<div class="${cls}">${L.map(e=>box(e,coloreFonte(e))).join('')}${vuote(Math.max(CASELLE_FASCIA,L.length)-L.length)}</div>
+    <div class="pe"><span class="p">P.${P.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(1,P.length)-P.length,'box')}</span><span class="e">E.${E.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(2,E.length)-E.length,'box')}</span></div>`;
+}
 function disegnaLavagna(){
   const el=document.getElementById('lav');
   const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
+  if(el.clientWidth<680){disegnaLavagnaTelefono(el,perG);return;}
+  el.className='lav';if(!EMBED)document.body.classList.remove('scorri');
   // caselle per riga: 4 come sulla lavagna vera; di più se una cella ne ha tante, così al massimo 3 righe e tutto sta nello schermo
   const maxCella=Math.max(CASELLE_FASCIA,...giorni.flatMap(g=>FASCE.map((f,i)=>(perG[g]||[]).filter(e=>fasciaDi(e)===i&&!e.zona).length)));
   el.style.setProperty('--cols',String(Math.max(4,Math.ceil(maxCella/3))));
   let h=`<div></div>${giorni.map(g=>{const d=isoToDate(g);return `<div class="giorno${g===oggiIso()?' today':''}">${GIORNI[d.getDay()]}<small>${d.getDate()}|${d.getMonth()+1}</small></div>`;}).join('')}`;
   FASCE.forEach((f,i)=>{
     h+=`<div class="fascia">${f.lbl.split('\n').map(x=>`<span>${x}</span>`).join('')}</div>`;
-    giorni.forEach(g=>{
-      const lista=(perG[g]||[]).filter(e=>fasciaDi(e)===i),L=lista.filter(e=>!e.zona),P=lista.filter(e=>e.zona==='P'),E=lista.filter(e=>e.zona==='E');
-      h+=`<div class="cella${g===oggiIso()?' today':''}"><div class="caselle">${L.map(e=>box(e,coloreFonte(e))).join('')}${vuote(Math.max(CASELLE_FASCIA,L.length)-L.length)}</div>
-        <div class="pe"><span class="p">P.${P.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(1,P.length)-P.length,'box')}</span><span class="e">E.${E.map(e=>box(e,coloreFonte(e),'box')).join('')}${vuote(Math.max(2,E.length)-E.length,'box')}</span></div></div>`;
-    });
+    giorni.forEach(g=>{h+=`<div class="cella${g===oggiIso()?' today':''}">${cellaFascia((perG[g]||[]).filter(e=>fasciaDi(e)===i),'caselle')}</div>`;});
   });
-  // in fondo solo le fonti vere (CC, Internet, Stand, Referenze): gli appuntamenti senza fonte restano nei giorni (grigi) finché l'ufficio non la mette
-  const fonti=[...new Set(tipi.filter(t=>t.gruppo==='appuntamenti'&&t.attivo&&t.fonte).map(t=>t.fonte))];
-  const sigla=f=>({'CC':'C.C.','Stand':'ST.','Internet':'INTERNET','Referenze':'R.F.'})[f]||f.toUpperCase();
-  h+=`<div class="tot">${fonti.map(f=>{const t=tipi.find(y=>y.gruppo==='appuntamenti'&&(y.fonte||y.nome)===f)||tipi.find(y=>(y.fonte||y.nome)===f),lista=pren.filter(e=>(tipoDi(e.tipo_codice).fonte||tipoDi(e.tipo_codice).nome)===f),fatte=lista.filter(e=>e.demo==='fatta').length,base=t.caselle_lavagna||20,n=Math.max(base,Math.ceil(lista.length/10)*10);
-    return `<div><div class="lbl" style="color:${COLORE_HEX[t.colore]}">${esc(sigla(f))}<small>${lista.length} presi su ${base}${fatte?' · '+fatte+' demo fatte':''}</small></div><div class="caselle" style="--tcols:${n<=20?10:n<=40?20:Math.ceil(n/2)}">${lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(n-lista.length)}</div></div>`;}).join('')}</div>`;
+  h+=`<div class="tot">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle" style="--tcols:${x.n<=20?10:x.n<=40?20:Math.ceil(x.n/2)}">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
+  el.innerHTML=h;
+  // non ci sta nello schermo (portatile, tablet)? allora la pagina scorre invece di tagliare le caselle
+  if(!EMBED&&el.scrollHeight>el.clientHeight+2)document.body.classList.add('scorri');
+}
+// Telefono: un giorno sotto l'altro, dentro le 4 fasce con le caselle; in fondo i gruppi per fonte
+function disegnaLavagnaTelefono(el,perG){
+  el.className='lav-m';document.body.classList.add('scorri');
+  let h=giorni.map(g=>{const d=isoToDate(g),n=(perG[g]||[]).length;return `<div class="giorno-m${g===oggiIso()?' today':''}"><h3><span>${GIORNI[d.getDay()]} ${d.getDate()}|${d.getMonth()+1}</span><small>${n} appuntament${n===1?'o':'i'}</small></h3>${FASCE.map((f,i)=>`<div class="fascia-m"><div class="lbl">${f.lbl.split('\n').join('<br>')}</div><div>${cellaFascia((perG[g]||[]).filter(e=>fasciaDi(e)===i),'caselle-m')}</div></div>`).join('')}</div>`;}).join('');
+  h+=`<div class="tot-m">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle-m">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
   el.innerHTML=h;
 }
 // ── orologio, aggiornamento automatico, tempo reale ──
