@@ -185,7 +185,7 @@ async function push(tipo: string, record: any, old: any) {
   // l'ufficio l'ha già scritto a mano su Google (riga arrivata dal pull, stesso giorno e stesso cliente/telefono)? mi collego a quello invece di crearne un doppio
   const gemello = await gemelloGoogle(record);
   if (gemello) {
-    const u = unione(record, { data_appuntamento: gemello.data_appuntamento, ora_appuntamento: gemello.ora_appuntamento, durata_min: gemello.durata_min, indirizzo: gemello.indirizzo, zona: gemello.zona, venditore: gemello.venditore, cliente: gemello.cliente, telefono: gemello.telefono, note: gemello.note, google_event_id: gemello.google_event_id, google_sync_at: new Date().toISOString() });
+    const u = unione(record, { data_appuntamento: gemello.data_appuntamento, ora_appuntamento: gemello.ora_appuntamento, durata_min: gemello.durata_min, indirizzo: gemello.indirizzo, zona: gemello.zona, venditore: gemello.venditore, cliente: gemello.cliente, telefono: gemello.telefono, note: gemello.note, google_colore: gemello.google_colore || null, google_event_id: gemello.google_event_id, google_sync_at: new Date().toISOString() });
     await sb.from("cc_registrazioni").update(u).eq("id", record.id);
     await sb.from("cc_registrazioni").delete().eq("id", gemello.id);   // la riga doppia arrivata da Google: resta quella della telefonista
     return "collegato all'evento già scritto su Google (riga doppia #" + gemello.id + " unita)";
@@ -269,7 +269,7 @@ async function applica(ev: any, riga: any) {
     if (riga && riga.data_appuntamento && riga.origine === "portale") {
       const g = await gemelloGoogle(riga);
       if (g) {
-        const u = unione(riga, { data_appuntamento: g.data_appuntamento, ora_appuntamento: g.ora_appuntamento, durata_min: g.durata_min, indirizzo: g.indirizzo, zona: g.zona, venditore: g.venditore, cliente: g.cliente, telefono: g.telefono, note: g.note, google_event_id: g.google_event_id, google_sync_at: new Date().toISOString() });
+        const u = unione(riga, { data_appuntamento: g.data_appuntamento, ora_appuntamento: g.ora_appuntamento, durata_min: g.durata_min, indirizzo: g.indirizzo, zona: g.zona, venditore: g.venditore, cliente: g.cliente, telefono: g.telefono, note: g.note, google_colore: g.google_colore || null, google_event_id: g.google_event_id, google_sync_at: new Date().toISOString() });
         await sb.from("cc_registrazioni").update(u).eq("id", riga.id);
         await sb.from("cc_registrazioni").delete().eq("id", g.id);
         return "doppione tolto dall'ufficio: riga #" + riga.id + " collegata all'evento scritto a mano (riga doppia #" + g.id + " unita)";
@@ -429,12 +429,19 @@ Deno.serve(async (req) => {
         pageToken = res.nextPageToken;
       } while (pageToken);
       const conteggi: Record<string, number> = {}; for (const c in perColore) conteggi[c] = perColore[c].length;
+      // &confronta=1: eventi il cui colore su Google è diverso da quello salvato nel portale
+      let diversi: any[] = [], nonInPortale = 0;
+      if (url.searchParams.get("confronta") === "1") {
+        const gids = Object.values(perColore).flat(); const mappa: Record<string, string | null> = {};
+        for (let i = 0; i < gids.length; i += 200) { const { data } = await sb.from("cc_registrazioni").select("google_event_id,google_colore,cliente,id").in("google_event_id", gids.slice(i, i + 200)); for (const r of data || []) mappa[r.google_event_id] = (r.google_colore || "nessuno") + "|" + r.id + "|" + (r.cliente || ""); }
+        for (const c in perColore) for (const gid of perColore[c]) { const m = mappa[gid]; if (!m) { nonInPortale++; continue; } const [pc, id, cliente] = m.split("|"); if (pc !== c) diversi.push({ gid, id: Number(id), cliente, google: c, portale: pc }); }
+      }
       let aggiornate = 0;
       if (applica) for (const c in perColore) {
         const ids = perColore[c], colore = c === "nessuno" ? null : c;
         for (let i = 0; i < ids.length; i += 200) { const { count } = await sb.from("cc_registrazioni").update({ google_colore: colore, google_sync_at: new Date().toISOString() }, { count: "exact" }).in("google_event_id", ids.slice(i, i + 200)); aggiornate += count || 0; }
       }
-      return Response.json({ ok: true, da, a, eventi: totale, conteggi, esempi, aggiornate });
+      return Response.json({ ok: true, da, a, eventi: totale, conteggi, esempi, aggiornate, diversi, nonInPortale });
     }
     if (url.searchParams.get("mode") === "colore") {      // una tantum: cambia/toglie il colore di un evento creato dal portale (solo se il creatore è il service account)
       const gid = url.searchParams.get("gid") || "", colore = url.searchParams.get("colore") || null;
@@ -443,13 +450,17 @@ Deno.serve(async (req) => {
       const dopo = await gapi("/events/" + gid, "PATCH", { colorId: colore });
       return Response.json({ ok: true, summary: dopo.summary, colorId: dopo.colorId || null });
     }
+    if (url.searchParams.get("mode") === "evento") {      // sola lettura: com'è un evento su Google adesso (colore, creato, ultimo aggiornamento)
+      const ev = await gapi("/events/" + (url.searchParams.get("gid") || ""));
+      return Response.json({ ok: true, id: ev.id, summary: ev.summary, colorId: ev.colorId || null, status: ev.status, created: ev.created, updated: ev.updated, start: ev.start, creator: ev.creator?.email });
+    }
     if (url.searchParams.get("mode") === "unisci") {      // una tantum: stesso appuntamento nel portale (riga P) e scritto a mano su Google (riga G dal pull): resta P, collegata all'evento dell'ufficio; il nostro doppione su Google viene tolto
       const pid = Number(url.searchParams.get("portale")), gid = Number(url.searchParams.get("google"));
       const P = (await sb.from("cc_registrazioni").select("*").eq("id", pid).single()).data, G = (await sb.from("cc_registrazioni").select("*").eq("id", gid).eq("origine", "google").single()).data;
       if (!P || !G || !G.google_event_id) return Response.json({ ok: false, errore: "righe non trovate" }, { status: 400 });
       if (!stessoCliente(P, G)) return Response.json({ ok: false, errore: "non sembrano lo stesso cliente" }, { status: 400 });
       let tolto = false; if (P.google_event_id && P.google_event_id !== G.google_event_id) tolto = await eliminaNostro(P.google_event_id);
-      const u = unione(P, { data_appuntamento: G.data_appuntamento, ora_appuntamento: G.ora_appuntamento, durata_min: G.durata_min, indirizzo: G.indirizzo, zona: G.zona, venditore: G.venditore, cliente: G.cliente, telefono: G.telefono, note: G.note, google_event_id: G.google_event_id, google_sync_at: new Date().toISOString() });
+      const u = unione(P, { data_appuntamento: G.data_appuntamento, ora_appuntamento: G.ora_appuntamento, durata_min: G.durata_min, indirizzo: G.indirizzo, zona: G.zona, venditore: G.venditore, cliente: G.cliente, telefono: G.telefono, note: G.note, google_colore: G.google_colore || null, google_event_id: G.google_event_id, google_sync_at: new Date().toISOString() });
       await sb.from("cc_registrazioni").update(u).eq("id", pid);
       await sb.from("cc_registrazioni").delete().eq("id", gid);
       return Response.json({ ok: true, portale: pid, riga_google_unita: gid, evento_ufficio: G.google_event_id, nostro_evento_tolto: tolto });
