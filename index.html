@@ -303,7 +303,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.4 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.5 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -543,7 +543,7 @@ function switchTab(el,id){
   const screen=el.closest('.screen');
   screen.querySelectorAll('.nav-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
   screen.querySelectorAll('.page-content > div').forEach(d=>d.classList.toggle('hidden',d.id!==id));
-  screen.querySelector('.page-content').classList.toggle('largo',id==='tab-calendario'||id==='op-tab-cal');
+  screen.querySelector('.page-content').classList.toggle('largo',['tab-calendario','op-tab-cal','tab-lavagna','op-tab-lav'].includes(id));   // calendario e lavagna a tutta larghezza (Davide 09/11)
 }
 
 // Tabelle compatte: una colonna per fonte, in ogni casella «contatti / appuntamenti»; le attività senza fonte restano una colonna ciascuna
@@ -882,7 +882,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.4')}
+      ${riga('ti-info-circle','gray','Versione','v4.5')}
     </div>`;
 }
 
