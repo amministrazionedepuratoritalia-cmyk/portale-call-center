@@ -137,7 +137,7 @@ if(vista==='calendario')document.getElementById('pan-lav').remove();
 if(vista==='lavagna')document.getElementById('pan-cal').remove();
 if(vista!=='entrambi')document.getElementById('tv').classList.add('solo');
 const EMBED=!!q.get('embed');
-if(EMBED){document.querySelector('.top').style.display='none';document.getElementById('tv').style.gridTemplateRows='1fr';document.getElementById('tv').style.padding='0';document.getElementById('tv').style.minHeight='0';document.body.classList.add('scorri');}
+if(EMBED){document.querySelector('.top').style.display='none';document.getElementById('tv').style.gridTemplateRows='1fr';document.getElementById('tv').style.padding='0';document.getElementById('tv').style.minHeight='0';}
 
 function yyyymmdd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function oggiIso(){return yyyymmdd(new Date());}
@@ -189,7 +189,7 @@ function disegna(){
   const l1=document.getElementById('leg1');if(l1)l1.innerHTML=legenda();const l2=document.getElementById('leg2');if(l2)l2.innerHTML=legendaLav();
   if(document.getElementById('cal'))disegnaCalendario();
   if(document.getElementById('lav'))disegnaLavagna();
-  if(EMBED)setTimeout(()=>{try{parent.postMessage({lavagnaAltezza:document.documentElement.scrollHeight},'*');}catch(e){}},60);
+  if(EMBED)setTimeout(()=>{try{parent.postMessage({lavagnaAltezza:document.documentElement.scrollHeight,scorre:document.body.classList.contains('scorri')},'*');}catch(e){}},60);
 }
 // ── calendario settimana (lun–sab) ──
 function layoutEv(lista){
@@ -238,15 +238,20 @@ function disegnaLavagna(){
   const el=document.getElementById('lav');
   const perG={};evs.forEach(e=>(perG[e.data_appuntamento]=perG[e.data_appuntamento]||[]).push(e));
   if(el.clientWidth<680){disegnaLavagnaTelefono(el,perG);return;}
-  el.className='lav';if(!EMBED)document.body.classList.remove('scorri');
+  el.className='lav';document.body.classList.remove('scorri');
   // misura delle caselle dallo spazio: 4 per riga come sulla lavagna vera, di più se una cella ne ha tante (al massimo 3 righe);
   // vanno a capo da sole, quindi non escono mai dal riquadro
   const maxCella=Math.max(CASELLE_FASCIA,...giorni.flatMap(g=>FASCE.map((f,i)=>(perG[g]||[]).filter(e=>fasciaDi(e)===i&&!e.zona).length)));
-  const cols=Math.max(4,Math.ceil(maxCella/3)),cellaW=(el.clientWidth-72)/6-14;
-  el.style.setProperty('--box',Math.max(12,Math.min(30,Math.floor((cellaW-(cols-1)*4)/cols)))+'px');
+  const cols=Math.max(4,Math.ceil(maxCella/3)),cellaW=(el.clientWidth-72)/6-14,righe=Math.ceil(Math.max(CASELLE_FASCIA,maxCella)/cols);
   // in fondo 10 caselle per riga come sulla lavagna vera (20 = 2 righe, 40 = 4 righe), misura dallo spazio del gruppo
-  const gruppoW=el.clientWidth/4-14;
-  el.style.setProperty('--tbox',Math.max(10,Math.min(24,Math.floor((gruppoW-27)/10)))+'px');
+  const gruppoW=el.clientWidth/4-14,righeTot=Math.ceil(Math.max(CASELLE_TOT,...gruppiFondo().map(x=>x.n))/10);
+  // e dall'altezza: la lavagna riempie lo schermo (TV) o il riquadro (portale) con le caselle più grandi possibili, senza uscire
+  const H=window.innerHeight-(EMBED?0:78)-52;                                   // meno barra in alto (TV) e cornice del pannello
+  const tbox=Math.max(10,Math.min(32,Math.floor((gruppoW-27)/10),Math.floor((H/4-40)/righeTot)-3));
+  const cellH=(H-50-(righeTot*(tbox+3)+40)-12)/4-10;                           // altezza di una cella fascia: tolti intestazione giorni e blocco in fondo
+  const boxH=Math.floor((cellH-26)/righe)-4,boxW=Math.floor((cellaW-(cols-1)*4)/cols);
+  el.style.setProperty('--box',Math.max(12,Math.min(64,boxW,boxH))+'px');
+  el.style.setProperty('--tbox',tbox+'px');
   let h=`<div></div>${giorni.map(g=>{const d=isoToDate(g);return `<div class="giorno${g===oggiIso()?' today':''}">${GIORNI[d.getDay()]}<small>${d.getDate()}|${d.getMonth()+1}</small></div>`;}).join('')}`;
   FASCE.forEach((f,i)=>{
     h+=`<div class="fascia">${f.lbl.split('\n').map(x=>`<span>${x}</span>`).join('')}</div>`;
@@ -255,7 +260,7 @@ function disegnaLavagna(){
   h+=`<div class="tot">${gruppiFondo().map(x=>`<div><div class="lbl" style="color:${COLORE_HEX[x.t.colore]}">${esc(x.sigla)}<small>${x.lista.length} presi ${labelGiornoFondo()} su ${x.base}${x.fatte?' · '+x.fatte+' demo fatte':''}</small></div><div class="caselle">${x.lista.map(e=>box(e,colorePreso(e))).join('')}${vuote(x.n-x.lista.length)}</div></div>`).join('')}</div>`;
   el.innerHTML=h;
   // ci sta nello schermo? provo con la pagina libera di crescere: se supera l'altezza dello schermo resta così (scorre), altrimenti torna a riempire lo schermo
-  if(!EMBED){document.body.classList.add('scorri');if(document.documentElement.scrollHeight<=window.innerHeight+1)document.body.classList.remove('scorri');}
+  document.body.classList.add('scorri');if(document.documentElement.scrollHeight<=window.innerHeight+1)document.body.classList.remove('scorri');
 }
 // Telefono: un giorno sotto l'altro, dentro le 4 fasce con le caselle; in fondo i gruppi per fonte
 function disegnaLavagnaTelefono(el,perG){

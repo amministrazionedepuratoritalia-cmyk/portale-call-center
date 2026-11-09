@@ -41,6 +41,7 @@
     .nav-tabs { display:flex; padding:0 16px; background:rgba(242,242,247,0.92); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px); border-bottom:0.5px solid rgba(0,0,0,0.12); overflow-x:auto; scrollbar-width:none; position:sticky; top:52px; z-index:99; }
     .nav-tabs::-webkit-scrollbar { display:none; }
     #screen-admin .nav-tabs { top:104px; }
+    #screen-admin.senza-subbar .subbar { display:none; } #screen-admin.senza-subbar .nav-tabs { top:52px; }
     .tab { padding:10px 14px; font-size:13px; cursor:pointer; border-bottom:1.5px solid transparent; color:var(--text3); white-space:nowrap; display:flex; align-items:center; gap:5px; transition:color .15s,border-color .15s; }
     .tab:hover { color:var(--text2); }
     .tab.active { color:var(--blue); border-bottom-color:var(--blue); font-weight:600; }
@@ -273,7 +274,7 @@
     @media(max-width:700px){ .two-col{ grid-template-columns:1fr; } .hide-mobile{ display:none; } }
     @media(max-width:560px){ .nav-arrow{ display:none; } .subbar select, .subbar input[type=date]{ font-size:16px; min-width:0; } }
     @media(max-width:500px){
-      .topbar{ padding:0 14px; height:48px; } .nav-tabs{ top:48px; } .subbar{ top:48px; } #screen-admin .nav-tabs{ top:100px; }
+      .topbar{ padding:0 14px; height:48px; } .nav-tabs{ top:48px; } .subbar{ top:48px; } #screen-admin .nav-tabs{ top:100px; } #screen-admin.senza-subbar .nav-tabs{ top:48px; }
       .page-content{ padding:12px; } .tab{ padding:9px 10px; font-size:12px; } input,select,textarea{ font-size:16px; }
       .reg-grid{ grid-template-columns:1fr 1fr; gap:8px; } .reg-btn{ min-height:110px; padding:14px 12px 12px; }
     }
@@ -303,7 +304,7 @@
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.5 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.6 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -544,6 +545,8 @@ function switchTab(el,id){
   screen.querySelectorAll('.nav-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
   screen.querySelectorAll('.page-content > div').forEach(d=>d.classList.toggle('hidden',d.id!==id));
   screen.querySelector('.page-content').classList.toggle('largo',['tab-calendario','op-tab-cal','tab-lavagna','op-tab-lav'].includes(id));   // calendario e lavagna a tutta larghezza (Davide 09/11)
+  screen.classList.toggle('senza-subbar',['tab-calendario','tab-lavagna'].includes(id));   // e senza la barra del periodo: hanno la loro navigazione
+  if(id==='tab-lavagna'||id==='op-tab-lav')requestAnimationFrame(sistemaLavagne);
 }
 
 // Tabelle compatte: una colonna per fonte, in ogni casella «contatti / appuntamenti»; le attività senza fonte restano una colonna ciascuna
@@ -882,7 +885,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.5')}
+      ${riga('ti-info-circle','gray','Versione','v4.6')}
     </div>`;
 }
 
@@ -1373,14 +1376,18 @@ async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PA
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
 let _lavSett=null;
 // la lavagna (tv.html dentro l'iframe) comunica la sua altezza: l'iframe si adatta, niente tagli né doppie barre di scorrimento
-window.addEventListener('message',e=>{if(e.data&&e.data.lavagnaAltezza)document.querySelectorAll('iframe[title="Lavagna"]').forEach(f=>{f.style.height=Math.max(300,e.data.lavagnaAltezza+8)+'px';});});
+// Il riquadro della lavagna è alto quanto resta della finestra (come sulla TV); se la lavagna non ci sta (schermo basso) si allunga quanto serve
+function altezzaLavagnaBase(f){return Math.max(420,window.innerHeight-f.getBoundingClientRect().top-16);}
+function sistemaLavagne(){document.querySelectorAll('iframe[title="Lavagna"]').forEach(f=>{if(f.offsetParent)f.style.height=altezzaLavagnaBase(f)+'px';});}
+window.addEventListener('resize',sistemaLavagne);
+window.addEventListener('message',e=>{if(e.data&&e.data.lavagnaAltezza)document.querySelectorAll('iframe[title="Lavagna"]').forEach(f=>{f.style.height=(e.data.scorre?Math.max(altezzaLavagnaBase(f),e.data.lavagnaAltezza+8):altezzaLavagnaBase(f))+'px';});});
 // Lavagna per le telefoniste: la stessa della TV, in sola lettura (niente caselle modificabili, niente elenco senza fonte)
 let _lavSettOp=null;
 function renderLavagnaOp(){
   const el=document.getElementById('op-tab-lav');if(!_lavSettOp)_lavSettOp=lunediDi(oggiIso());
   el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSettOp=lunediDi(oggiIso());renderLavagnaOp()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSettOp=isoAddDays(_lavSettOp,-7);renderLavagnaOp()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSettOp=isoAddDays(_lavSettOp,7);renderLavagnaOp()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSettOp)}</div></div>
-    <div class="muted" style="padding:0 4px 8px">La lavagna dell'ufficio, come sulla TV: nei giorni gli appuntamenti fissati (colore della fonte; P. = Piemonte, E. = Emilia-Romagna), in fondo gli appuntamenti presi oggi (nero = settimana in corso, rosso = settimana successiva; ogni giorno si riparte). Si aggiorna da sola.</div>
-    <iframe src="tv.html?vista=lavagna&embed=1&v=35&settimana=${_lavSettOp}" style="width:100%;height:600px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+    <iframe src="tv.html?vista=lavagna&embed=1&v=45&settimana=${_lavSettOp}" style="width:100%;height:600px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+  requestAnimationFrame(sistemaLavagne);
 }
 async function caselleLavagna(codice,delta){const t=tipoDi(codice),n=Math.max(10,(t.caselle_lavagna||20)+delta);try{await api(`cc_tipi?codice=eq.${codice}`,'PATCH',{caselle_lavagna:n});t.caselle_lavagna=n;renderLavagna();toast(`${t.fonte}: ${n} caselle in fondo`);}catch(e){toast('Errore: '+e.message);}}
 async function renderLavagna(){
@@ -1389,10 +1396,10 @@ async function renderLavagna(){
   const tvUrl=new URL('tv.html',location.href).href;
   el.innerHTML=`<div class="cal-head"><button class="btn btn-sm" onclick="_lavSett=lunediDi(oggiIso());renderLavagna()">Questa settimana</button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,-7);renderLavagna()"><i class="ti ti-chevron-left"></i></button><button class="nav-arrow" style="display:inline-flex" onclick="_lavSett=isoAddDays(_lavSett,7);renderLavagna()"><i class="ti ti-chevron-right"></i></button><div class="cal-title">Settimana ${labelSettimana(_lavSett)}</div>
       <a class="btn btn-sm" href="${tvUrl}" target="_blank"><i class="ti ti-device-tv"></i> Lavagna per la TV</a><a class="btn btn-sm" href="${tvUrl}?vista=calendario" target="_blank"><i class="ti ti-calendar"></i> Calendario a blocchi per la TV</a></div>
-    <div class="muted" style="padding:0 4px 6px">Sulla TV apri «Lavagna per la TV» a schermo intero (F11): mostra solo la lavagna. Il calendario della settimana a blocchi è una pagina a parte. Si aggiorna da sola. Nei giorni: gli appuntamenti fissati, col colore della fonte (P. = Piemonte, E. = Emilia-Romagna). In fondo: gli appuntamenti presi <b>oggi</b> per fonte (ogni giorno si riparte da vuote), caselle che si riempiono di <b>nero</b> (appuntamento nella settimana in corso, oppure preso venerdì per il lunedì dopo) o di <b>rosso</b> (settimana successiva).</div>
     ${senzaFonte.length?`<div class="alert alert-info" style="margin:0 4px 10px"><b>${senzaFonte.length} appuntament${senzaFonte.length===1?'o':'i'} senza fonte</b> presi questa settimana (non compaiono nelle caselle in fondo): ${senzaFonte.slice(0,8).map(r=>`<a href="#" onclick="event.preventDefault();apriEvento(${r.id})">${esc(r.cliente||'Cliente n.i.')}</a>`).join(', ')}${senzaFonte.length>8?' …':''}. Aprili e scegli la fonte.</div>`:''}
     <div class="flex wrap" style="gap:8px;padding:0 4px 10px;align-items:center"><span class="muted">Caselle in fondo:</span>${tipiAttivi().filter(t=>t.gruppo==='appuntamenti'&&t.fonte).map(t=>`<span class="pill bg-${t.colore} c-${t.colore}" style="gap:6px">${esc(t.fonte)} <b>${t.caselle_lavagna||20}</b> <button class="btn btn-xs" title="Togli 10 caselle" onclick="caselleLavagna('${t.codice}',-10)">−10</button><button class="btn btn-xs" title="Aggiungi 10 caselle" onclick="caselleLavagna('${t.codice}',10)">+10</button></span>`).join('')}</div>
-    <iframe src="tv.html?vista=lavagna&embed=1&v=35&settimana=${_lavSett}" style="width:100%;height:600px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+    <iframe src="tv.html?vista=lavagna&embed=1&v=45&settimana=${_lavSett}" style="width:100%;height:600px;border:none;border-radius:16px;background:#fff" title="Lavagna"></iframe>`;
+  requestAnimationFrame(sistemaLavagne);
 }
 
 // ── Modal / toast ──
