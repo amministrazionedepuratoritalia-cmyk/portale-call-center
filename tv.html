@@ -105,7 +105,74 @@
     .lav-m .tot-m { border:2px solid #222; border-radius:10px; background:#fff; padding:8px 10px; display:flex; flex-direction:column; gap:10px; }
     .lav-m .tot-m .lbl { font-weight:800; font-size:14px; margin-bottom:4px; }
     .lav-m .tot-m .lbl small { font-weight:600; color:#666; margin-left:6px; }
+    /* ═══ TEMA STAGIONALE (Natale): acceso dallo sviluppatore del portale (chiave TEMA in cc_sync_state) ═══ */
+/* ══ TEMA NATALE «Bianco Natale» — leggero e pulito: il portale resta com'è, con pochi tocchi rossi e la neve solo nel login. ══ */
+body.tema-natale { --rosso:#C8102E; --rosso-scuro:#9E0F22; --verde:#1B7A4A; --oro:#D4AF37; }
+/* ── barra in alto: rosso Natale pulito, testo avorio, cappello sul titolo, auguri in corsivo, conto alla rovescia ── */
+body.tema-natale .tv .top { position:relative; background:linear-gradient(180deg,#D2203A,#B8102A 65%,#A50E25); color:#fff; border-bottom:none; box-shadow:0 2px 10px rgba(179,0,27,.22); margin:0 -16px; padding:0 20px; }
+@media(max-width:680px){ body.tema-natale .tv .top { margin:0 -8px; padding:8px 10px; } }
+body.tema-natale .tv .top .logo { background:rgba(255,255,255,.95); padding:4px 8px; border-radius:10px; box-sizing:content-box; }
+body.tema-natale .topbar::after, body.tema-natale .tv .top::after { content:''; position:absolute; left:0; right:0; bottom:-2px; height:2px; background:linear-gradient(90deg,transparent,var(--oro) 20% 80%,transparent); pointer-events:none; opacity:.9; }
+body.tema-natale .topbar h1, body.tema-natale .topbar .muted, body.tema-natale .topbar .btn-ghost, body.tema-natale .tv .top h1, body.tema-natale .tv .top .sett, body.tema-natale .tv .top .ora, body.tema-natale .tv .top .agg { color:#fff !important; }
+body.tema-natale .topbar .btn-ghost:hover { background:rgba(255,255,255,.14); }
+body.tema-natale .live-badge { background:rgba(255,255,255,.2); color:#fff; } body.tema-natale .live-badge .dot { background:#8CFFB8; }
+body.tema-natale .conto-natale { display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.35); color:#fff; font-size:12px; font-weight:600; padding:5px 11px; border-radius:50px; white-space:nowrap; }
+body.tema-natale .conto-natale b { font-size:15px; font-weight:800; letter-spacing:-.3px; }
+body.tema-natale .conto-natale svg { width:14px; height:14px; }
+body.tema-natale .natale-op { font-family:'Great Vibes', cursive; font-weight:400; font-size:22px; color:#FFE9A8; margin-left:14px; white-space:nowrap; text-shadow:0 1px 0 rgba(0,0,0,.15); }
+body.tema-natale #screen-op .topbar > .conto-natale { margin-left:auto; margin-right:10px; }
+body.tema-natale .topbar h1, body.tema-natale .tv .top h1 { position:relative; }
+body.tema-natale .topbar h1 .cappello { position:absolute; left:-10px; top:-13px; width:26px; height:22px; transform:rotate(-18deg); pointer-events:none; }
+body.tema-natale .tv .top h1 .cappello { position:absolute; left:-12px; top:-8px; width:34px; height:28px; transform:rotate(-18deg); pointer-events:none; }
+body.tema-natale .topbar h1::after { content:'Buon Natale'; font-family:'Great Vibes', cursive; font-weight:400; font-size:23px; margin-left:14px; color:#FFE9A8; letter-spacing:.3px; }
+body.tema-natale .tv .top .sett::after { content:'  ·  Buon Natale'; font-family:'Great Vibes', cursive; font-weight:400; font-size:1.45em; color:#FFE9A8; }
+/* accenti rossi: pulsanti principali e scheda attiva (i colori dei dati non cambiano) */
+body.tema-natale .tab.active { color:var(--rosso); border-bottom-color:var(--rosso); }
+body.tema-natale .seg button.on { color:var(--rosso); }
+body.tema-natale .cal-wh.today .n, body.tema-natale .cal-cell.today .cal-num { background:var(--rosso); }
+/* cappellino di Babbo Natale sugli avatar delle telefoniste (piccolo, in alto a sinistra) */
+body.tema-natale .avatar { position:relative; overflow:visible; }
+body.tema-natale .avatar::after { content:''; position:absolute; left:-7px; top:-9px; width:22px; height:19px; transform:rotate(-22deg); background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 34'><path d='M6,26 C4,14 14,2 28,3 c-6,8 -8,14 -6,23z' fill='%23D5203B'/><path d='M6,26 C4,14 14,2 28,3 c-3,2 -5,4 -7,7 c-8,2 -12,8 -13,16z' fill='%23F15A6E' opacity='.5'/><circle cx='29' cy='3.5' r='4' fill='%23fff'/><rect x='3' y='24' width='22' height='7' rx='3.5' fill='%23fff'/></svg>") center/contain no-repeat; filter:drop-shadow(0 1px 1px rgba(0,0,0,.25)); pointer-events:none; }
+/* saluto del mattino: cornice natalizia */
+body.tema-natale .modal { border-top:4px solid var(--rosso); }
+/* ── LOGIN: bianco e ghiaccio, neve leggera, auguri in rosso, rametto di agrifoglio sulla scheda ── */
+body.tema-natale .login-screen { background:linear-gradient(180deg,#FFFFFF 0%,#F1F5FA 55%,#E4EBF4 100%); position:relative; overflow:hidden; }
+body.tema-natale .login-screen::after { content:''; position:absolute; left:-10%; right:-10%; bottom:-60px; height:180px; pointer-events:none;
+  background:radial-gradient(ellipse at 25% 100%, #FFFFFF 0 60%, transparent 61%) 0 0/60% 100% no-repeat, radial-gradient(ellipse at 75% 100%, #FBFCFE 0 62%, transparent 63%) 40% 0/70% 100% no-repeat; opacity:1; filter:drop-shadow(0 -6px 14px rgba(120,150,190,.18)); }
+body.tema-natale .login-inner { position:relative; z-index:2; }
+body.tema-natale .login-logo-wrap { margin-bottom:18px; }
+body.tema-natale .natale-auguri { text-align:center; font-family:'Great Vibes', cursive; font-weight:400; font-size:46px; line-height:1; color:var(--rosso); margin:8px 0 2px; position:relative; display:inline-block; left:50%; transform:translateX(-50%); }
+body.tema-natale .natale-auguri .scintilla { position:absolute; width:10px; height:10px; color:var(--oro); animation:scintilla 2.4s ease-in-out infinite; }
+body.tema-natale .natale-auguri .scintilla svg { width:100%; height:100%; display:block; }
+@keyframes scintilla { 0%,100%{opacity:.2; transform:scale(.6) rotate(0deg)} 50%{opacity:1; transform:scale(1.1) rotate(15deg)} }
+body.tema-natale .login-title { margin-top:2px; }
+body.tema-natale .login-card { position:relative; overflow:visible; }
+body.tema-natale .login-card .agrifoglio { position:absolute; right:-14px; top:-18px; width:74px; height:60px; pointer-events:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.15)); }
+/* neve: fitta nel login, leggera dentro il portale e sulla TV; fiocchi azzurro-grigi visibili su fondo chiaro */
+.neve { position:absolute; inset:0; pointer-events:none; z-index:1; overflow:hidden; }
+.neve-pagina { position:fixed; inset:0; pointer-events:none; z-index:-1; overflow:hidden; }
+.neve span, .neve-pagina span { position:absolute; top:-6vh; border-radius:50%; background:radial-gradient(circle at 45% 45%, #A9C1DD 0 38%, rgba(169,193,221,.7) 62%, rgba(169,193,221,0) 100%); animation:nevica linear infinite; }
+.neve span.fiocco, .neve-pagina span.fiocco { background:none; border-radius:0; color:#B9CDE4; text-shadow:0 0 2px rgba(255,255,255,.9); line-height:1; animation:nevica-gira linear infinite; }
+.neve span.lontano, .neve-pagina span.lontano { filter:blur(1px); }
+@keyframes nevica { 0%{transform:translate3d(0,0,0)} 50%{transform:translate3d(18px,55vh,0)} 100%{transform:translate3d(-12px,110vh,0)} }
+@keyframes nevica-gira { 0%{transform:translate3d(0,0,0) rotate(0deg)} 50%{transform:translate3d(22px,55vh,0) rotate(180deg)} 100%{transform:translate3d(-14px,110vh,0) rotate(360deg)} }
+@media (prefers-reduced-motion: reduce){ .neve, .neve-pagina{ display:none; } .natale-auguri .scintilla{ animation:none; } }
+@media (max-width:700px){ body.tema-natale .topbar h1::after{ display:none; } body.tema-natale .conto-natale{ display:none; } body.tema-natale .natale-op{ display:none; } body.tema-natale .natale-auguri{ font-size:40px; } }
+/* ── alberi di Natale ai lati: nel login sulle colline di neve, dentro il portale nei margini della pagina (solo schermi larghi) ── */
+.alberi { position:fixed; inset:0; pointer-events:none; z-index:-1; }   /* dietro a tutto: non coprono mai i dati */
+.alberi .albero-lato { position:absolute; bottom:0; width:min(220px, calc((100vw - 1100px)/2 - 14px)); height:auto; aspect-ratio:220/300; }
+.alberi .sx { left:8px; } .alberi .dx { right:8px; }
+.alberi svg { width:100%; height:100%; display:block; overflow:visible; }
+.alberi .bulbo { animation:lucina 2s ease-in-out infinite alternate; } .alberi .bulbo:nth-child(3n){ animation-delay:-.7s } .alberi .bulbo:nth-child(3n+1){ animation-delay:-1.3s }
+@keyframes lucina { from{opacity:.4} to{opacity:1} }
+@media (max-width:1240px){ .alberi { display:none; } }
+body.tema-natale .login-screen .alberi { position:absolute; z-index:1; display:block; }
+body.tema-natale .login-screen .alberi .albero-lato { width:min(240px, 26vw); bottom:10px; }
+body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login-screen .alberi .dx { right:3vw; }
+@media (max-width:700px){ body.tema-natale .login-screen .alberi .albero-lato { width:96px; bottom:0; } body.tema-natale .login-screen .alberi .sx { left:2px; } body.tema-natale .login-screen .alberi .dx { right:2px; } }
+
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="tv" id="tv">
@@ -273,6 +340,18 @@ function disegnaLavagnaTelefono(el,perG){
 function orologio(){const d=new Date();document.getElementById('orologio').textContent=d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});}
 orologio();setInterval(orologio,10000);
 carica();setInterval(carica,60000);
+// ══ TEMA STAGIONALE (Natale) ══ lo accende lo sviluppatore dal portale; qui: barra rossa con cappello e auguri, neve leggera. Niente dentro l'iframe del portale.
+let _tema='nessuno';
+async function controllaTema(){if(EMBED)return;try{const r=await api('cc_sync_state?select=v&k=eq.TEMA');applicaTema((r[0]&&r[0].v)||'nessuno');}catch(e){}}
+function applicaTema(nome){if(nome!=='natale')nome='nessuno';if(nome===_tema)return;document.querySelectorAll('.neve-pagina,.cappello').forEach(e=>e.remove());document.body.classList.remove('tema-'+_tema);_tema=nome;if(nome==='natale'){document.body.classList.add('tema-natale');decoraNatale();}}
+function decoraNatale(){let seed=11;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};const NS='http://www.w3.org/2000/svg';
+  const cappello=`<svg class="cappello" viewBox="0 0 40 34" xmlns="${NS}"><path d="M6,26 C4,14 14,2 28,3 c-6,8 -8,14 -6,23z" fill="#D5203B"/><path d="M6,26 C4,14 14,2 28,3 c-3,2 -5,4 -7,7 c-8,2 -12,8 -13,16z" fill="#F15A6E" opacity=".5"/><circle cx="29" cy="3.5" r="4" fill="#fff"/><rect x="3" y="24" width="22" height="7" rx="3.5" fill="#fff"/></svg>`;
+  document.querySelectorAll('.top h1').forEach(h1=>h1.insertAdjacentHTML('afterbegin',cappello));
+  const neve=document.createElement('div');neve.className='neve-pagina';
+  [['lontano',14,2,3.5,26],['medio',10,3,5,19],['vicino',6,4,7,14]].forEach(([cls,n,min,max,dur])=>{for(let i=0;i<n;i++){const sp=document.createElement('span');const glifo=rnd()<.4;const size=min+rnd()*(max-min);sp.className=cls+(glifo?' fiocco':'');if(glifo){sp.textContent='❄';sp.style.fontSize=(size*2.6)+'px';}else{sp.style.width=size+'px';sp.style.height=size+'px';}sp.style.cssText+=`;left:${rnd()*100}%;animation-duration:${dur+rnd()*10}s;animation-delay:-${rnd()*34}s;opacity:${cls==='lontano'?.45:cls==='medio'?.7:.9}`;neve.appendChild(sp);}});
+  document.body.appendChild(neve);}
+controllaTema();setInterval(controllaTema,60000);
+
 window.addEventListener('resize',()=>disegna());
 try{
   const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);let t=null;
