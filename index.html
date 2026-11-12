@@ -374,7 +374,7 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.8 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.9 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -507,12 +507,20 @@ function iniziali(n){return n.split(' ').map(x=>x[0]).join('').slice(0,2).toUppe
 function pct(a,b){return b?Math.round(a/b*100):0;}
 
 // ── API Supabase (REST con chiave anon, come nel Portale Tecnici) ──
+// Il database restituisce al massimo 1000 righe per richiesta (12/11: il trend di 8 settimane ne ha 1382 e i conti erano sbagliati).
+// Se una lettura riempie la pagina, la rileggo tutta a pagine da 1000 con un ordine stabile (…,id): nessuna riga resta fuori.
+const MAX_RIGHE=1000;
 async function api(path,method='GET',body=null){
   const opts={method,headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':method==='PATCH'?'return=representation':''}};
   if(body)opts.body=JSON.stringify(body);
-  const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,opts);
-  if(!res.ok)throw new Error(await res.text());
-  const t=await res.text();return t?JSON.parse(t):[];
+  const leggi=async p=>{const res=await fetch(SUPABASE_URL+'/rest/v1/'+p,opts);if(!res.ok)throw new Error(await res.text());const t=await res.text();return t?JSON.parse(t):[];};
+  const righe=await leggi(path);
+  if(method!=='GET'||!Array.isArray(righe)||righe.length<MAX_RIGHE||/[?&](limit|offset)=/.test(path))return righe;
+  const m=path.match(/([?&])order=([^&]*)/);
+  const ordinato=m?(/(^|,)id(\.|,|$)/.test(m[2])?path:path.replace(m[0],m[1]+'order='+m[2]+',id')):path+(path.includes('?')?'&':'?')+'order=id';
+  let tutte=[];
+  for(let off=0;;off+=MAX_RIGHE){const pag=await leggi(`${ordinato}&limit=${MAX_RIGHE}&offset=${off}`);tutte=tutte.concat(pag);if(pag.length<MAX_RIGHE)break;}
+  return tutte;
 }
 
 // ── Stato ──
@@ -1029,7 +1037,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.8')}
+      ${riga('ti-info-circle','gray','Versione','v4.9')}
     </div>`;
 }
 
