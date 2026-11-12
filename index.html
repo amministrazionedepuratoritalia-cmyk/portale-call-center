@@ -374,7 +374,7 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.7 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.8 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -713,7 +713,7 @@ function cardOperatrice(o,regs,opt={}){
 }
 // Demo: l'admin la segna sugli appuntamenti; le telefoniste la vedono
 function isApp(r){return codiciGruppo('appuntamenti').has(r.tipo_codice);}
-function demoBadge(r){return r.demo==='fatta'?`<span class="pill bg-green c-green"><i class="ti ti-check"></i> Demo fatta${r.demo_data?' il '+ddmm(r.demo_data):''}</span>`:r.demo==='non_fatta'?`<span class="pill bg-red c-red"><i class="ti ti-x"></i> Demo non fatta</span>`:`<span class="pill bg-gray c-gray"><i class="ti ti-clock"></i> Demo da fare</span>`;}
+function demoBadge(r){const g=r.demo&&r.demo_manuale===false?' · da Google':'';return r.demo==='fatta'?`<span class="pill bg-green c-green"><i class="ti ti-check"></i> Demo fatta${r.demo_data?' il '+ddmm(r.demo_data):''}${g}</span>`:r.demo==='non_fatta'?`<span class="pill bg-red c-red"><i class="ti ti-x"></i> Demo non fatta${g}</span>`:`<span class="pill bg-gray c-gray"><i class="ti ti-clock"></i> Demo da fare</span>`;}
 function contaDemo(regs){const app=regs.filter(isApp);return{app:app.length,fatte:app.filter(r=>r.demo==='fatta').length,non:app.filter(r=>r.demo==='non_fatta').length,da:app.filter(r=>!r.demo).length};}
 function tileDemo(regs){const n=contaDemo(regs);if(!n.app)return'';return `<div class="metric" style="border-top:3px solid var(--green-sys)"><div class="val c-green">${n.fatte}</div><div class="lbl">Demo fatte</div><div class="sub">${pct(n.fatte,n.app)}% degli appuntamenti</div></div>`;}
 const LEGENDA='<div class="muted" style="padding:0 4px 8px">In ogni casella: <b>contatti</b> <span class="sl">/</span> <b class="c-green">appuntamenti presi</b></div>';
@@ -1029,7 +1029,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.7')}
+      ${riga('ti-info-circle','gray','Versione','v4.8')}
     </div>`;
 }
 
@@ -1176,7 +1176,7 @@ async function renderAndamento(){
     ${trend}
     ${blocco}
     <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card">${graficoLinea(ore.map(h=>h+':00'),ore.map(h=>perOra[h]),{colore:t.colore})}</div>
-    ${_metricaAnd==='g:demo'?'<div class="muted" style="padding:0 4px 8px">Le demo sono contate sul giorno in cui è stato preso l\'appuntamento.</div>':''}`;
+    ${_metricaAnd==='g:demo'?'<div class="muted" style="padding:0 4px 8px">Le demo sono contate sul giorno in cui è stato preso l\'appuntamento. L\'esito arriva da solo dal calendario Google dopo il giorno dell\'appuntamento (grigio o blu = non fatta, gli altri colori = fatta); se lo cambi a mano nella scheda Appuntamenti vale il tuo.</div>':''}`;
 }
 
 // ── REGISTRAZIONI (periodo, con filtri e Excel) ──
@@ -1199,12 +1199,12 @@ function rigaApp(r){
   return `<div class="row" id="app-${r.id}"><div class="row-ic bg-${t.colore} c-${t.colore}"><i class="ti ti-calendar-check"></i></div>
     <div class="row-body"><div class="row-title"><b>${esc(r.cliente||'Cliente non indicato')}</b>${o.senza?'':' · '+esc(o.nome)} · ${esc(t.fonte||t.nome)}${r.solo_calendario?' <span class="pill bg-gray c-gray">solo calendario</span>':''}</div>
     <div class="row-sub">${[r.telefono,r.data_appuntamento?'appuntamento '+ddmmyyyy(r.data_appuntamento)+(r.ora_appuntamento?' alle '+hm(r.ora_appuntamento):''):'preso '+labelGiorno(r.data),r.indirizzo,r.zona?zonaLabel(r.zona):'',r.venditore?'demo di '+r.venditore:'',r.note,r.demo==='fatta'&&r.demo_data?'demo il '+ddmmyyyy(r.demo_data):''].filter(Boolean).map(esc).join(' · ')}</div></div>
-    <div class="demo-seg"><button class="btn btn-xs" title="Apri nel calendario" onclick="apriEvento(${r.id})"><i class="ti ti-calendar"></i></button><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}</div></div>`;
+    <div class="demo-seg"><button class="btn btn-xs" title="Apri nel calendario" onclick="apriEvento(${r.id})"><i class="ti ti-calendar"></i></button><button class="btn btn-xs ${r.demo==='fatta'?'btn-success':''}" onclick="setDemo(${r.id},'fatta')"><i class="ti ti-check"></i> Demo fatta</button><button class="btn btn-xs ${r.demo==='non_fatta'?'btn-danger':''}" onclick="setDemo(${r.id},'non_fatta')"><i class="ti ti-x"></i> Non fatta</button>${r.demo?`<button class="btn btn-xs" title="Torna a «da fare»" onclick="setDemo(${r.id},null)"><i class="ti ti-arrow-back-up"></i></button>`:''}${r.demo&&r.demo_manuale===false?'<span class="muted" title="Esito letto dal colore dell\'evento su Google Calendar: se lo cambi a mano vale il tuo" style="font-size:11px;align-self:center;margin-left:4px">da Google</span>':''}</div></div>`;
 }
 async function setDemo(id,v){
   try{
-    await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});
-    Object.values(_cache).forEach(c=>c.regs.concat(c.cal||[]).forEach(r=>{if(r.id===id){r.demo=v;r.demo_data=v?oggiIso():null;}}));
+    await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null,demo_manuale:true});   // scelta a mano: il calcolo automatico da Google non la cambia più
+    Object.values(_cache).forEach(c=>c.regs.concat(c.cal||[]).forEach(r=>{if(r.id===id){r.demo=v;r.demo_data=v?oggiIso():null;r.demo_manuale=true;}}));
     renderAppuntamenti();toast(v==='fatta'?'Demo segnata come fatta':v==='non_fatta'?'Demo segnata come non fatta':'Rimessa tra quelle da fare');
   }catch(e){toast('Errore: '+e.message);}
 }
@@ -1465,8 +1465,8 @@ async function renderCalendario(target,editable){
   el.innerHTML=head+body+listaSenza;
 }
 // Appuntamento in elenco (vista settimana): ora, (consulente) fonte - cliente, sotto telefonista · telefono e indirizzo
-function itemEv(e){const o=opDi(e.operatrice_id);return `<div class="cal-item" style="${stileEv(e)}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${e.ora_appuntamento?hm(e.ora_appuntamento)+(fineEv(e)?'–'+fineEv(e):'')+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b><span class="cal-sub">${esc([o.senza?'':o.nome.split(' ')[0],e.telefono].filter(Boolean).join(' · '))}</span>${e.indirizzo?`<span class="cal-sub">${esc(e.indirizzo)}</span>`:''}</div>`;}
-function chipEv(e){return `<div class="cal-ev solido" style="${stileEv(e)}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</div>`;}
+function itemEv(e){const o=opDi(e.operatrice_id);return `<div class="cal-item" style="${stileEv(e)}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${e.ora_appuntamento?hm(e.ora_appuntamento)+(fineEv(e)?'–'+fineEv(e):'')+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b><span class="cal-sub">${esc([o.senza?'':o.nome.split(' ')[0],e.telefono].filter(Boolean).join(' · '))}</span>${e.indirizzo?`<span class="cal-sub">${esc(e.indirizzo)}</span>`:''}</div>`;}
+function chipEv(e){return `<div class="cal-ev solido" style="${stileEv(e)}" onclick="event.stopPropagation();apriEvento(${e.id})" title="${esc(e.cliente||'')} · ${esc(opDi(e.operatrice_id).nome)}">${e.ora_appuntamento?hm(e.ora_appuntamento)+' ':''}${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</div>`;}
 // Appuntamenti che si sovrappongono nello stesso giorno: affiancati in colonne, come in Google Calendar
 function layoutEv(lista){
   const evs=lista.map(e=>({e,s:minuti(e.ora_appuntamento),f:minuti(e.ora_appuntamento)+Math.max(30,e.durata_min||120)})).sort((a,b)=>a.s-b.s||a.f-b.f);
@@ -1475,7 +1475,7 @@ function layoutEv(lista){
   evs.forEach(x=>{if(x.s>=fine)chiudi();fine=Math.max(fine,x.f);cluster.push(x);});chiudi();
   return out;
 }
-function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||120)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block solido" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;${stileEv(e)}${e.demo==='fatta'?';opacity:.65':''}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b><span class="cal-sub">${esc([hm(e.ora_appuntamento)+(fineEv(e)?'–'+fineEv(e):''),o.senza?'':o.nome.split(' ')[0],e.telefono].filter(Boolean).join(' · '))}</span>${e.indirizzo?`<span class="cal-sub">${esc(e.indirizzo)}</span>`:''}</div>`;}
+function blockEv(x){const e=x.e||x,col=x.col||0,ncol=x.ncol||1;const t=tipoDi(e.tipo_codice),m=minuti(e.ora_appuntamento),top=Math.max(0,(m-CAL_H0*60)*CAL_HH/60),h=Math.max(22,(e.durata_min||120)*CAL_HH/60);const o=opDi(e.operatrice_id);return `<div class="cal-block solido" style="top:${top.toFixed(0)}px;height:${(h-2).toFixed(0)}px;left:calc(${(col*100/ncol).toFixed(2)}% + 2px);width:calc(${(100/ncol).toFixed(2)}% - 4px);right:auto;${stileEv(e)}" onclick="event.stopPropagation();apriEvento(${e.id})"><b>${e.demo==='fatta'?'✓ ':''}${esc(titoloEv(e))}</b><span class="cal-sub">${esc([hm(e.ora_appuntamento)+(fineEv(e)?'–'+fineEv(e):''),o.senza?'':o.nome.split(' ')[0],e.telefono].filter(Boolean).join(' · '))}</span>${e.indirizzo?`<span class="cal-sub">${esc(e.indirizzo)}</span>`:''}</div>`;}
 function calClickGiorno(ev,g){if(_calVista==='mese'&&(!_calEdit||window.matchMedia('(max-width:700px)').matches)){_calData=g;calVista('giorno');return;}if(!_calEdit)return;apriEvento(null,g);}
 function calClickOra(ev,g){if(!_calEdit)return;const y=ev.clientY-ev.currentTarget.getBoundingClientRect().top;const h=CAL_H0+Math.floor(y/CAL_HH),m=Math.floor((y%CAL_HH)/(CAL_HH/2))*30;apriEvento(null,g,`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);}
 // Scheda appuntamento: nuova (id null) o modifica; in sola lettura per le telefoniste
@@ -1515,7 +1515,7 @@ async function salvaEvento(id){
 }
 async function eliminaEvento(id){if(!confirm('Eliminare questo appuntamento? Sparisce anche dalle statistiche.'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'DELETE');chiudiModal();invalidaCache();renderCalendario();onPeriodoChange();}catch(e){toast('Errore: '+e.message);}}
 async function contaInStatistiche(id){if(!confirm('Da ora questo appuntamento conta nelle statistiche come preso il giorno indicato. Confermi?'))return;try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{solo_calendario:false});invalidaCache();chiudiModal();renderCalendario();toast('Ora conta nelle statistiche');}catch(e){toast('Errore: '+e.message);}}
-async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null});invalidaCache();chiudiModal();renderCalendario();toast('Demo aggiornata');}catch(e){toast('Errore: '+e.message);}}
+async function setDemoCal(id,v){try{await api(`cc_registrazioni?id=eq.${id}`,'PATCH',{demo:v,demo_data:v?oggiIso():null,demo_manuale:true});invalidaCache();chiudiModal();renderCalendario();toast('Demo aggiornata');}catch(e){toast('Errore: '+e.message);}}
 
 // ── LAVAGNA (replica digitale della lavagna in ufficio) e pagina TV: stanno in tv.html, qui incorporata ──
 let _lavSett=null;
