@@ -1,7 +1,7 @@
 -- 12/11/2026 — Demo fatte lette dal calendario Google.
 -- Davide: «sul portale c'è il calendario appuntamenti che rispecchia Google Calendar: fai sì che il grafico si aggiorni con i dati corretti».
 -- L'ufficio ricolora su Google gli appuntamenti DOPO che sono avvenuti (quelli futuri non sono mai grigi né blu Mirtillo):
---   grigio Grafite (colorId 8) = saltato · blu Mirtillo (colorId 9) = da richiamare/riconfermare → demo NON fatta
+--   grigio Grafite (colorId 8) = saltato → demo NON fatta (dal 022: il blu Mirtillo conta come fatta)
 --   qualsiasi altro colore (o nessuno) → demo FATTA
 -- Verifica sui dati: settimana del 22/10, 106 appuntamenti − 29 grigi = 77 = le demo del report dell'ufficio.
 -- Vale solo per gli appuntamenti che contano nelle statistiche (non «solo calendario»), già passati e collegati a un evento Google.

@@ -374,7 +374,7 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v4.9 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v5.0 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -1037,7 +1037,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v4.9')}
+      ${riga('ti-info-circle','gray','Versione','v5.0')}
     </div>`;
 }
 
@@ -1131,6 +1131,15 @@ function graficoLinea(etichette,valori,opt={}){
 }
 // ── TREND (come nel Portale Tecnici): ultimi 14 giorni / 8 settimane / 6 mesi, una metrica alla volta, scala a scelta ──
 let _trendRegs={},_scalaTrend={};
+// DEMO FATTE (Davide 12/11: «le demo sono tutte tranne i grigi»): dal calendario, sul giorno dell'appuntamento.
+// Ogni appuntamento gia' passato conta come demo fatta, tranne i grigi (Grafite, colorId 8) su Google; se l'esito e' stato scelto a mano nel portale vale quello.
+// Comprende anche gli appuntamenti creati su Google prima del portale («solo calendario»): nel calendario ci sono.
+function demoFatta(r){
+  if(!isApp(r)||!r.data_appuntamento||r.data_appuntamento>=oggiIso())return false;   // quelle di oggi compaiono da domani
+  if(r.demo_manuale)return r.demo==='fatta';
+  return r.google_event_id?r.google_colore!=='8':r.demo==='fatta';
+}
+async function appCalendario(start,end){const k='cal|'+start+'|'+end;if(!_trendRegs[k])_trendRegs[k]=await api(`cc_registrazioni?tipo_codice=in.(${[...codiciGruppo('appuntamenti')].join(',')})&data_appuntamento=gte.${start}&data_appuntamento=lte.${end}&select=id,operatrice_id,tipo_codice,data,data_appuntamento,ora_appuntamento,demo,demo_manuale,google_colore,google_event_id`);return _trendRegs[k];}
 function filtraMetrica(regs,metrica){if(metrica==='g:demo')return regs.filter(r=>isApp(r)&&r.demo==='fatta');const codici=metrica.startsWith('g:')?codiciGruppo(metrica.slice(2)):new Set([metrica]);return regs.filter(r=>codici.has(r.tipo_codice));}
 function periodiTrend(){
   const oggi=oggiIso(),out=[];
@@ -1155,22 +1164,27 @@ async function renderAndamento(){
   const opzioni=(G?[{codice:'g:contatti',nome:'Tutti i contatti',colore:'blue'},{codice:'g:appuntamenti',nome:'Tutti gli appuntamenti',colore:'green'},{codice:'g:demo',nome:'Demo fatte',colore:'purple'}]:[]).concat(ta);
   if(!_metricaAnd||!opzioni.some(t=>t.codice===_metricaAnd))_metricaAnd=opzioni[0]?.codice;
   const t=opzioni.find(x=>x.codice===_metricaAnd)||tipoDi(_metricaAnd);
-  const regs=filtraMetrica(d.regs,_metricaAnd);
+  const DEMO=_metricaAnd==='g:demo';
+  let dcal=[],tcal=[];
+  if(DEMO){try{[dcal,tcal]=await Promise.all([appCalendario(p.start,p.end),appCalendario(per[0].start,per[per.length-1].end)]);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+    if(_squadra){dcal=dcal.filter(r=>inSquadra(r.operatrice_id));tcal=tcal.filter(r=>inSquadra(r.operatrice_id));}}
+  const giornoDi=r=>DEMO?r.data_appuntamento:r.data;   // demo: giorno dell'appuntamento (come nel calendario); il resto: giorno in cui è stato registrato
+  const regs=DEMO?dcal.filter(demoFatta):filtraMetrica(d.regs,_metricaAnd);
   // Trend: un punto per periodo, il periodo scelto nel menu è evidenziato, l'ultimo (in corso) è tratteggiato
-  const serie=filtraMetrica(tregs,_metricaAnd),valTrend=per.map(q=>serie.filter(r=>r.data>=q.start&&r.data<=q.end).length);
+  const serie=DEMO?tcal.filter(demoFatta):filtraMetrica(tregs,_metricaAnd),valTrend=per.map(q=>serie.filter(r=>giornoDi(r)>=q.start&&giornoDi(r)<=q.end).length);
   const selTrend=per.findIndex(q=>p.start>=q.start&&p.start<=q.end),scala=_scalaTrend[_metricaAnd]||{};
   const titoloTrend=_periodoMode==='giorno'?'Trend ultimi 14 giorni':_periodoMode==='sett'?'Trend ultime 8 settimane <span style="font-weight:500;text-transform:none;letter-spacing:0">(giovedì → mercoledì)</span>':'Trend ultimi 6 mesi';
   const trend=`<div class="section-title">${titoloTrend} · ${esc(t.nome)}</div><div class="card">
     <div class="flex wrap" style="gap:8px;margin-bottom:10px"><span class="muted">Scala:</span><input id="trend-min" type="number" placeholder="min" value="${scala.min??''}" style="width:76px;padding:6px 8px;font-size:13px" onchange="applicaScalaTrend()"><span class="muted">–</span><input id="trend-max" type="number" placeholder="max" value="${scala.max??''}" style="width:76px;padding:6px 8px;font-size:13px" onchange="applicaScalaTrend()"><button class="btn btn-xs" onclick="scalaAutoTrend()">Auto</button><span class="muted" style="margin-left:auto">tratteggiato = periodo in corso</span></div>
     ${graficoLinea(per.map(q=>q.label),valTrend,{colore:t.colore,evidenzia:selTrend,inCorso:per[per.length-1].end>=oggiIso(),min:scala.min,max:scala.max})}</div>`;
   // per ora del giorno (sempre)
-  const perOra=Array(24).fill(0);regs.forEach(r=>perOra[new Date(r.ora).getHours()]++);
+  const perOra=Array(24).fill(0);regs.forEach(r=>{const h=DEMO?(r.ora_appuntamento?+String(r.ora_appuntamento).slice(0,2):null):new Date(r.ora).getHours();if(h!=null)perOra[h]++;});   // demo: ora dell'appuntamento
   const h0=Math.min(8,perOra.findIndex(v=>v>0)<0?8:perOra.findIndex(v=>v>0)),h1=Math.max(19,23-[...perOra].reverse().findIndex(v=>v>0));
   // per giorno (settimana / mese) oppure per telefonista (giorno)
   let blocco='';
   if(p.mode!=='giorno'){
     const giorni=[];for(let g=p.start;g<=p.end;g=isoAddDays(g,1))giorni.push(g);
-    const perG={};regs.forEach(r=>perG[r.data]=(perG[r.data]||0)+1);
+    const perG={};regs.forEach(r=>{const g=giornoDi(r);perG[g]=(perG[g]||0)+1;});
     const tot=regs.length,gg=giorni.filter(g=>perG[g]).length;
     blocco=`<div class="section-title">${esc(t.nome)} per giorno · totale ${tot}${gg?` · media ${(tot/gg).toFixed(1).replace('.',',')} al giorno lavorato`:''}</div><div class="card">${graficoLinea(giorni.map(g=>p.mode==='sett'?labelGiorno(g,false):String(isoToDate(g).getDate())),giorni.map(g=>perG[g]||0),{colore:t.colore,evidenzia:giorni.indexOf(oggiIso()),spenti:giorni.map(g=>isoToDate(g).getDay()===0)})}</div>`;
   }else{
@@ -1184,7 +1198,7 @@ async function renderAndamento(){
     ${trend}
     ${blocco}
     <div class="section-title">${esc(t.nome)} per ora del giorno</div><div class="card">${graficoLinea(ore.map(h=>h+':00'),ore.map(h=>perOra[h]),{colore:t.colore})}</div>
-    ${_metricaAnd==='g:demo'?'<div class="muted" style="padding:0 4px 8px">Le demo sono contate sul giorno in cui è stato preso l\'appuntamento. L\'esito arriva da solo dal calendario Google dopo il giorno dell\'appuntamento (grigio o blu = non fatta, gli altri colori = fatta); se lo cambi a mano nella scheda Appuntamenti vale il tuo.</div>':''}`;
+    ${DEMO?'<div class="muted" style="padding:0 4px 8px">Demo fatte = appuntamenti del calendario già passati, tranne quelli grigi su Google, contati sul giorno dell\'appuntamento. Quelle di oggi compaiono da domani. Se cambi l\'esito a mano nella scheda Appuntamenti vale il tuo.</div>':''}`;
 }
 
 // ── REGISTRAZIONI (periodo, con filtri e Excel) ──
