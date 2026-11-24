@@ -405,6 +405,14 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
     .pranzo .pallini span { width:18px; height:18px; display:block; opacity:.45; font-size:18px; line-height:1; }
     .pranzo .pallini span.si { opacity:1; }
     .pranzo .pallini svg { width:100%; height:100%; display:block; }
+    .ob-testa { display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; margin:16px 0 8px; padding-left:4px; }
+    .ob-testa .section-title { margin:0; padding-left:0; }
+    .ampolla > .premio-box { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:4px; max-width:100%; }
+    .premio-box .premio { white-space:normal; text-align:center; line-height:1.25; max-width:100%; }
+    .premio-nota { font-size:11px; font-weight:600; color:var(--text3); }
+    .premio-nota.si { color:#8A6100; }
+    .ob-riga { border-top:0.5px solid rgba(0,0,0,0.1); margin-top:14px; padding-top:10px; }
+    .ob-nome { font-weight:800; font-size:15px; }
     @media (max-width:560px){ .ampolle{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .ampolle > .ampolla:last-child:nth-child(odd){ grid-column:1 / -1; justify-self:center; width:calc(50% - 5px); box-sizing:border-box; } .ampolla-num{ font-size:22px; }
       .pranzo { display:grid; grid-template-columns:46px minmax(0,1fr); column-gap:14px; row-gap:7px; }
       .pranzo .ic { grid-row:1 / span 2; }
@@ -435,7 +443,7 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v5.2 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v5.3 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -1103,7 +1111,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v5.2')}
+      ${riga('ti-info-circle','gray','Versione','v5.3')}
     </div>`;
 }
 
@@ -1237,7 +1245,7 @@ function fioccoOro(uid,c){
 const NASTRO_Y=LABBRO+2.2,NASTRO_H=5.8;   // nastrino del collo, del colore della fonte (oro quando l'ampolla è piena)
 let _uidCuore=0;
 function cuoreSVG(o,conta,anima){
-  const uid='c'+(++_uidCuore),diviso=!!o.parti,ord=Math.max(0,OBIETTIVI.indexOf(o));
+  const uid='c'+(++_uidCuore),diviso=!!o.parti,ord=o.ord??Math.max(0,OBIETTIVI.indexOf(o));
   const parti=diviso?o.parti.map((pt,i)=>({T:pt.tacche,n:conta[i],col:pt.col})):[{T:o.tacche,n:conta[0],col:o.col}];
   const pieno=parti.every(p=>p.n>=p.T),cA=parti[0].col,cB=parti[parti.length-1].col;
   let liquido='',tacche='',caustiche='';
@@ -1304,16 +1312,61 @@ const CUORE_VUOTO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const coloreFonte=o=>o.parti?mescola(o.parti[0].col[1],o.parti[1].col[1],.5):o.col[1];
 const tonoTesto=o=>mescola(coloreFonte(o),'#000000',.12);
 let _fineSalita=0;
+// ── obiettivi e premi modificabili (solo account sviluppatore): cc_sync_state, voce OBIETTIVI (SQL 024)
+// {"mesi":{"AAAA-MM":{"ampolle":{"Stand":{"tacche":240,"premio":"…"},"CC":{"parti":{"Mattino":36,"Pomeriggio":20},"premio":"…"}},"pranzo":"…"}}}
+// Ogni mese usa i suoi, altrimenti quelli dell'ultimo mese salvato prima, altrimenti quelli di OBIETTIVI qui sopra.
+let _cfgObiettivi={mesi:{}};
+async function caricaCfgObiettivi(){
+  try{const r=await api('cc_sync_state?select=v&k=eq.OBIETTIVI');const c=r.length?JSON.parse(r[0].v||'{}'):{};_cfgObiettivi={mesi:(c&&c.mesi&&typeof c.mesi==='object')?c.mesi:{}};}
+  catch(e){/* restano gli ultimi letti (o quelli di base) */}
+}
+function cfgDelMese(mese){const m=_cfgObiettivi.mesi||{};if(m[mese])return m[mese];const prima=Object.keys(m).filter(k=>k<mese).sort().pop();return prima?m[prima]:null;}
+function obiettiviDelMese(mese){
+  const c=cfgDelMese(mese)||{},a=c.ampolle||{},num=(v,d)=>{v=Math.round(+v);return v>=1&&v<=999?v:d;};
+  return OBIETTIVI.map((o,ord)=>{const x=a[o.nome]||{},premio=String(x.premio||'').slice(0,60);
+    return o.parti?{...o,ord,premio,parti:o.parti.map(pt=>({...pt,tacche:num((x.parti||{})[pt.nome],pt.tacche)}))}:{...o,ord,premio,tacche:num(x.tacche,o.tacche)};});
+}
+const pranzoDelMese=mese=>String((cfgDelMese(mese)||{}).pranzo||'').slice(0,60)||'Pranzo tutti insieme';
+const nomeDelMese=mese=>isoToDate(mese+'-01').toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+function apriObiettivi(mese){
+  if(!isDev(currentUser))return toast('Solo lo sviluppatore può cambiare obiettivi e premi');
+  const lista=obiettiviDelMese(mese),nome=nomeDelMese(mese);
+  apriModal(`<h2>Obiettivi e premi · ${esc(nome)}</h2>
+    <div class="muted">Valgono da ${esc(nome)} in poi, finché non li cambi. Ogni tacca è una demo fatta; il premio compare sotto l'ampolla e si sblocca quando è piena.</div>
+    ${lista.map((o,i)=>`<div class="ob-riga"><div class="ob-nome">${esc(o.nome)}</div>
+      ${o.parti?`<div class="two-col">${o.parti.map((pt,j)=>`<div><label>Demo ${esc(pt.nome)}</label><input type="number" id="ob-t-${i}-${j}" min="1" max="999" inputmode="numeric" value="${pt.tacche}"></div>`).join('')}</div>`
+               :`<label>Demo da fare</label><input type="number" id="ob-t-${i}" min="1" max="999" inputmode="numeric" value="${o.tacche}">`}
+      <label>Premio</label><input id="ob-p-${i}" maxlength="60" value="${esc(o.premio)}" placeholder="es. Buono Amazon da 50 €"></div>`).join('')}
+    <div class="ob-riga"><div class="ob-nome">Tutte e 5 piene</div><label>Premio finale</label><input id="ob-pranzo" maxlength="60" value="${esc(pranzoDelMese(mese))}"></div>
+    <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaObiettivi('${mese}')">Salva</button></div>`);
+}
+async function salvaObiettivi(mese){
+  if(!isDev(currentUser))return toast('Solo lo sviluppatore può cambiare obiettivi e premi');
+  const v=id=>document.getElementById(id).value.trim(),num=id=>{const n=+v(id);return Number.isInteger(n)&&n>=1&&n<=999?n:null;};
+  const ampolle={};
+  for(const [i,o] of obiettiviDelMese(mese).entries()){
+    if(o.parti){const parti={};for(const [j,pt] of o.parti.entries()){const n=num(`ob-t-${i}-${j}`);if(!n)return toast(`${o.nome} ${pt.nome}: scrivi un numero intero da 1 a 999`);parti[pt.nome]=n;}ampolle[o.nome]={parti,premio:v(`ob-p-${i}`)};}
+    else{const n=num(`ob-t-${i}`);if(!n)return toast(`${o.nome}: scrivi un numero intero da 1 a 999`);ampolle[o.nome]={tacche:n,premio:v(`ob-p-${i}`)};}
+  }
+  try{
+    await caricaCfgObiettivi();   // rileggo prima di scrivere, così non perdo i mesi già salvati
+    const nuovo={mesi:{..._cfgObiettivi.mesi,[mese]:{ampolle,pranzo:v('ob-pranzo')||'Pranzo tutti insieme'}}};
+    const r=await api('cc_sync_state?k=eq.OBIETTIVI','PATCH',{v:JSON.stringify(nuovo)});
+    if(!r.length)await api('cc_sync_state','POST',{k:'OBIETTIVI',v:JSON.stringify(nuovo)});
+    _cfgObiettivi=nuovo;chiudiModal();toast('Obiettivi e premi salvati');renderObiettivi(false);
+  }catch(e){toast('Errore: '+e.message);}
+}
 let _meseObiettivi=null;
 async function renderObiettivi(anima){
   const el=document.getElementById('tab-obiettivi'),p=periodoCorrente();
   const mese=p.start.slice(0,7),r=meseRange(mese);
   if(!el.innerHTML||anima)el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
-  let righe;try{righe=await appCalendario(r.start,r.end);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  let righe;try{[righe]=await Promise.all([appCalendario(r.start,r.end),caricaCfgObiettivi()]);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
   const demo=righe.filter(demoFatta),nomeMese=isoToDate(r.start).toLocaleDateString('it-IT',{month:'long',year:'numeric'});
   const contaFonte=(f,sq)=>demo.filter(x=>(tipoDi(x.tipo_codice).fonte||'')===f&&(!sq||opDi(x.operatrice_id).squadra===sq)).length;
+  const lista=obiettiviDelMese(mese),pranzoNome=pranzoDelMese(mese);
   let piene=0;const pienaOgni=[];
-  const carte=OBIETTIVI.map(o=>{
+  const carte=lista.map(o=>{
     const conta=o.parti?o.parti.map(pt=>contaFonte(o.fonte,pt.squadra)):[contaFonte(o.fonte)];
     const esiste=tipi.some(t=>t.fonte===o.fonte);
     const pieno=o.parti?o.parti.every((pt,i)=>conta[i]>=pt.tacche):conta[0]>=o.tacche;if(pieno)piene++;pienaOgni.push(pieno);
@@ -1322,12 +1375,18 @@ async function renderObiettivi(anima){
       sotto=`<div class="ampolla-num">${N}<span> / ${T}</span></div><div class="ampolla-parti">${o.parti.map((pt,i)=>`<div><b>${conta[i]}</b>/${pt.tacche}${conta[i]>=pt.tacche?' <span style="color:var(--green)">✓</span>':''}<small><span class="pt" style="background:${pt.col[1]}"></span>${esc(pt.nome)}</small></div>`).join('')}</div>${senza>0?`<div class="ampolla-sub" title="Demo CC senza telefonista indicata: non vanno né al Mattino né al Pomeriggio">${senza} senza squadra</div>`:''}`;}
     else{const n=conta[0],T=o.tacche,manca=T-n;
       sotto=`<div class="ampolla-num">${n}<span> / ${T}</span></div><div class="ampolla-sub">${!esiste?'fonte non ancora nel portale':n>=T?`<b>Obiettivo raggiunto${n>T?' · +'+(n-T):''}</b>`:`<span class="pc">${n>0?Math.min(99,Math.max(1,pct(n,T))):0}%</span> · ne mancano ${manca}`}</div>`;}
-    const premio=pieno?`<div class="premio si"><i class="ti ti-gift"></i> Premio sbloccato!</div>`:`<div class="premio"><i class="ti ti-lock"></i> Premio a ${o.parti?o.parti.map(pt=>pt.tacche).join(' + '):o.tacche+' demo'}</div>`;
+    const soglia=o.parti?o.parti.map(pt=>pt.tacche).join(' + '):o.tacche;
+    const premio=`<div class="premio-box">${o.premio
+      ?(pieno?`<div class="premio si"><i class="ti ti-gift"></i> ${esc(o.premio)}</div><div class="premio-nota si">Premio sbloccato!</div>`
+             :`<div class="premio"><i class="ti ti-lock"></i> ${esc(o.premio)}</div><div class="premio-nota">si sblocca a ${soglia} demo</div>`)
+      :(pieno?`<div class="premio si"><i class="ti ti-gift"></i> Premio sbloccato!</div>`
+             :`<div class="premio"><i class="ti ti-lock"></i> Premio a ${o.parti?soglia:soglia+' demo'}</div>`)}</div>`;
     return `<div class="ampolla${pieno?' piena':''}" style="--tono:${tonoTesto(o)}"><div class="ampolla-svg">${cuoreSVG(o,conta,anima)}</div><div class="ampolla-nome">${esc(o.nome)}</div>${sotto}${premio}</div>`;
   }).join('');
-  const tutte=piene===OBIETTIVI.length;
-  const pranzo=`<div class="pranzo${tutte?' si':''}"><div class="ic"><i class="ti ti-tools-kitchen-2"></i></div><div><b>${tutte?'Pranzo tutti insieme: sbloccato!':'Pranzo tutti insieme'}</b><div class="muted">${tutte?'Tutte e 5 le ampolle sono piene. Complimenti a tutte!':`Si sblocca quando tutte e 5 le ampolle sono piene · adesso ${piene} su ${OBIETTIVI.length}`}</div></div><div class="pallini">${OBIETTIVI.map((o,i)=>`<span class="${pienaOgni[i]?'si':''}" style="color:${coloreFonte(o)}" title="${esc(o.nome)}${pienaOgni[i]?' · piena':''}">${pienaOgni[i]?CUORE_PIENO_IC:CUORE_VUOTO}</span>`).join('')}</div></div>`;
-  el.innerHTML=`<div class="section-title">Obiettivi di ${esc(nomeMese)} · demo fatte</div>
+  const tutte=piene===lista.length;
+  const pranzo=`<div class="pranzo${tutte?' si':''}"><div class="ic"><i class="ti ti-tools-kitchen-2"></i></div><div><b>${esc(pranzoNome)}${tutte?': sbloccato!':''}</b><div class="muted">${tutte?'Tutte e 5 le ampolle sono piene. Complimenti a tutte!':`Si sblocca quando tutte e 5 le ampolle sono piene · adesso ${piene} su ${lista.length}`}</div></div><div class="pallini">${lista.map((o,i)=>`<span class="${pienaOgni[i]?'si':''}" style="color:${coloreFonte(o)}" title="${esc(o.nome)}${pienaOgni[i]?' · piena':''}">${pienaOgni[i]?CUORE_PIENO_IC:CUORE_VUOTO}</span>`).join('')}</div></div>`;
+  const modifica=isDev(currentUser)?`<button class="btn btn-sm" onclick="apriObiettivi('${mese}')"><i class="ti ti-pencil"></i> Modifica obiettivi e premi</button>`:'';
+  el.innerHTML=`<div class="ob-testa"><div class="section-title">Obiettivi di ${esc(nomeMese)} · demo fatte</div>${modifica}</div>
     <div class="muted" style="padding:0 4px 10px">Ogni tacca è una demo fatta: gli appuntamenti del calendario già passati, tranne quelli grigi su Google. Le ampolle si colorano da sole man mano che le demo vengono fatte e il 1° del mese si svuotano. Il CC è diviso tra squadra Mattino (lobo sinistro) e Pomeriggio (lobo destro).</div>
     ${pranzo}<div class="ampolle">${carte}</div>`;
   // a fine salita toglie le classi dell'apertura e le tacche grigie «di passaggio»: lo stato fermo è quello finale
