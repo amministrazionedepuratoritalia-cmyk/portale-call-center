@@ -407,6 +407,8 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
     .pranzo .pallini svg { width:100%; height:100%; display:block; }
     .ob-testa { display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; margin:16px 0 8px; padding-left:4px; }
     .ob-testa .section-title { margin:0; padding-left:0; }
+    .ob-tit { display:flex; align-items:center; gap:6px 10px; flex-wrap:wrap; }
+    .ob-azioni { display:flex; gap:6px; flex-wrap:wrap; }
     .ampolla > .premio-box { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:4px; max-width:100%; }
     .premio-box .premio { white-space:normal; text-align:center; line-height:1.25; max-width:100%; }
     .premio-nota { font-size:11px; font-weight:600; color:var(--text3); }
@@ -443,7 +445,7 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
           <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3">
         </div>
         <button class="btn btn-primary btn-full" onclick="doLogin()"><i class="ti ti-login"></i> Entra</button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v5.3 — Depuratoritalia</div>
+        <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--text4)">v5.4 — Depuratoritalia</div>
       </div>
     </div>
   </div>
@@ -516,7 +518,7 @@ body.tema-natale .login-screen .alberi .sx { left:3vw; } body.tema-natale .login
   </div>
   <div class="nav-tabs">
     <div class="tab active" onclick="switchTab(this,'tab-live');renderLive()"><i class="ti ti-broadcast"></i> Adesso</div>
-    <div class="tab" onclick="switchTab(this,'tab-obiettivi');renderObiettivi(true)"><i class="ti ti-heart"></i> Obiettivi</div>
+    <div class="tab" onclick="switchTab(this,'tab-obiettivi');_dalOb=null;renderObiettivi(true)"><i class="ti ti-heart"></i> Obiettivi</div>
     <div class="tab" onclick="switchTab(this,'tab-operatrici');renderOperatrici()"><i class="ti ti-users"></i> Telefoniste</div>
     <div class="tab" onclick="switchTab(this,'tab-andamento');renderAndamento()"><i class="ti ti-chart-bar"></i> Andamento</div>
     <div class="tab" onclick="switchTab(this,'tab-calendario');renderCalendario(document.getElementById('tab-calendario'),true)"><i class="ti ti-calendar"></i> Calendario</div>
@@ -766,7 +768,7 @@ function switchTab(el,id){
   screen.querySelectorAll('.nav-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
   screen.querySelectorAll('.page-content > div').forEach(d=>d.classList.toggle('hidden',d.id!==id));
   const largo=['tab-calendario','op-tab-cal','tab-lavagna','op-tab-lav'].includes(id);screen.querySelector('.page-content').classList.toggle('largo',largo);document.body.classList.toggle('scheda-larga',largo);   // calendario e lavagna a tutta larghezza (Davide 09/11); il tema nasconde gli alberi
-  screen.classList.toggle('senza-subbar',['tab-calendario','tab-lavagna'].includes(id));   // e senza la barra del periodo: hanno la loro navigazione
+  screen.classList.toggle('senza-subbar',['tab-calendario','tab-lavagna','tab-obiettivi'].includes(id));   // e senza la barra del periodo: hanno la loro navigazione
   if(id==='tab-lavagna'||id==='op-tab-lav')requestAnimationFrame(sistemaLavagne);
 }
 
@@ -1111,7 +1113,7 @@ async function renderSviluppatore(){
       ${riga('ti-layout-grid','purple',`<a href="${base}tv.html?vista=calendario" target="_blank">Calendario a blocchi per la TV</a>`,'tv.html?vista=calendario')}
       ${riga('ti-database','gray',`<a href="https://supabase.com/dashboard/project/${SUPABASE_URL.split('//')[1].split('.')[0]}" target="_blank">Database (Supabase)</a>`,'tabelle cc_*')}
       ${riga('ti-brand-github','gray',`<a href="https://github.com/amministrazionedepuratoritalia-cmyk/portale-call-center" target="_blank">Codice su GitHub</a>`,'ogni push aggiorna il sito in circa un minuto')}
-      ${riga('ti-info-circle','gray','Versione','v5.3')}
+      ${riga('ti-info-circle','gray','Versione','v5.4')}
     </div>`;
 }
 
@@ -1313,58 +1315,100 @@ const coloreFonte=o=>o.parti?mescola(o.parti[0].col[1],o.parti[1].col[1],.5):o.c
 const tonoTesto=o=>mescola(coloreFonte(o),'#000000',.12);
 let _fineSalita=0;
 // ── obiettivi e premi modificabili (solo account sviluppatore): cc_sync_state, voce OBIETTIVI (SQL 024)
-// {"mesi":{"AAAA-MM":{"ampolle":{"Stand":{"tacche":240,"premio":"…"},"CC":{"parti":{"Mattino":36,"Pomeriggio":20},"premio":"…"}},"pranzo":"…"}}}
-// Ogni mese usa i suoi, altrimenti quelli dell'ultimo mese salvato prima, altrimenti quelli di OBIETTIVI qui sopra.
-let _cfgObiettivi={mesi:{}};
+// {"periodi":[{"dal":"AAAA-MM-GG","al":"AAAA-MM-GG","ampolle":{"Stand":{"tacche":240,"premio":"…"},"CC":{"parti":{"Mattino":36,"Pomeriggio":20},"premio":"…"}},"pranzo":"…"}]}
+// Davide 24/11: «devo poter decidere io da che giorno farlo partire… e che giorno farlo finire».
+// Ogni periodo conta le demo fatte da «dal» ad «al» compresi; i periodi non si accavallano.
+// Senza periodi salvati: il mese in corso con i valori di OBIETTIVI qui sopra.
+let _cfgObiettivi={periodi:[]},_dalOb=null;   // _dalOb = periodo scelto con le frecce (null = quello giusto per oggi)
+const isoOk=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'')&&yyyymmdd(isoToDate(s))===s;
+const perData=(a,b)=>a.dal<b.dal?-1:a.dal>b.dal?1:0;
 async function caricaCfgObiettivi(){
-  try{const r=await api('cc_sync_state?select=v&k=eq.OBIETTIVI');const c=r.length?JSON.parse(r[0].v||'{}'):{};_cfgObiettivi={mesi:(c&&c.mesi&&typeof c.mesi==='object')?c.mesi:{}};}
+  try{const r=await api('cc_sync_state?select=v&k=eq.OBIETTIVI');let c=r.length?JSON.parse(r[0].v||'{}'):{};if(!c||typeof c!=='object')c={};
+    const lista=Array.isArray(c.periodi)?c.periodi.filter(p=>p&&isoOk(p.dal)&&isoOk(p.al)&&p.dal<=p.al):[];
+    _cfgObiettivi={...c,periodi:lista.sort(perData)};}
   catch(e){/* restano gli ultimi letti (o quelli di base) */}
 }
-function cfgDelMese(mese){const m=_cfgObiettivi.mesi||{};if(m[mese])return m[mese];const prima=Object.keys(m).filter(k=>k<mese).sort().pop();return prima?m[prima]:null;}
-function obiettiviDelMese(mese){
-  const c=cfgDelMese(mese)||{},a=c.ampolle||{},num=(v,d)=>{v=Math.round(+v);return v>=1&&v<=999?v:d;};
+// periodo da mostrare: quello scelto con le frecce, altrimenti quello in corso, poi l'ultimo già partito, poi il prossimo
+function periodoObiettivi(){
+  const P=_cfgObiettivi.periodi,oggi=oggiIso();
+  const p=(_dalOb&&P.find(x=>x.dal===_dalOb))||P.find(x=>x.dal<=oggi&&oggi<=x.al)||P.filter(x=>x.dal<=oggi).pop()||P[0];
+  if(p)return{...p,salvato:true};
+  const m=meseRange(yyyymm(new Date()));return{dal:m.start,al:m.end,ampolle:{},pranzo:'',salvato:false};
+}
+function obiettiviDi(per){
+  const a=per.ampolle||{},num=(v,d)=>{v=Math.round(+v);return v>=1&&v<=999?v:d;};
   return OBIETTIVI.map((o,ord)=>{const x=a[o.nome]||{},premio=String(x.premio||'').slice(0,60);
     return o.parti?{...o,ord,premio,parti:o.parti.map(pt=>({...pt,tacche:num((x.parti||{})[pt.nome],pt.tacche)}))}:{...o,ord,premio,tacche:num(x.tacche,o.tacche)};});
 }
-const pranzoDelMese=mese=>String((cfgDelMese(mese)||{}).pranzo||'').slice(0,60)||'Pranzo tutti insieme';
-const nomeDelMese=mese=>isoToDate(mese+'-01').toLocaleDateString('it-IT',{month:'long',year:'numeric'});
-function apriObiettivi(mese){
+const pranzoDi=per=>String(per.pranzo||'').slice(0,60)||'Pranzo tutti insieme';
+const giornoMese=iso=>{const d=isoToDate(iso);return (d.getDate()===1?'1°':d.getDate())+' '+MESI_BREVI[d.getMonth()];};   // «24 nov», «1° dic»
+const giorniTra=(a,b)=>Math.round((isoToDate(b)-isoToDate(a))/864e5);
+function etichettaPeriodo(per){const y=new Date().getFullYear(),ya=+per.dal.slice(0,4),yb=+per.al.slice(0,4);
+  return `dal ${giornoMese(per.dal)}${ya!==yb?' '+ya:''} al ${giornoMese(per.al)}${ya!==yb||yb!==y?' '+yb:''}`;}
+function statoPeriodo(per){const oggi=oggiIso();
+  if(oggi<per.dal)return{cls:'blue',txt:'parte il '+giornoMese(per.dal)};
+  if(oggi>per.al)return{cls:'gray',txt:'finito il '+giornoMese(per.al)};
+  const n=giorniTra(oggi,per.al)+1;return{cls:'green',txt:n===1?'in corso · ultimo giorno':`in corso · mancano ${n} giorni`};}
+function frecciaOb(dir){const P=_cfgObiettivi.periodi,i=P.findIndex(x=>x.dal===periodoObiettivi().dal),n=P[i+dir];if(n){_dalOb=n.dal;renderObiettivi(true);}}
+function apriObiettivi(nuovo){
   if(!isDev(currentUser))return toast('Solo lo sviluppatore può cambiare obiettivi e premi');
-  const lista=obiettiviDelMese(mese),nome=nomeDelMese(mese);
-  apriModal(`<h2>Obiettivi e premi · ${esc(nome)}</h2>
-    <div class="muted">Valgono da ${esc(nome)} in poi, finché non li cambi. Ogni tacca è una demo fatta; il premio compare sotto l'ampolla e si sblocca quando è piena.</div>
+  const cur=periodoObiettivi(),P=_cfgObiettivi.periodi;let per=cur;
+  if(nuovo){   // nuovo periodo: parte il giorno dopo l'ultimo (o oggi), dura un mese; obiettivi e premi copiati da quello mostrato
+    const oggi=oggiIso(),dopo=P.length?isoAddDays(P[P.length-1].al,1):oggi,inizio=dopo>oggi?dopo:oggi,d=isoToDate(inizio);
+    per={...cur,dal:inizio,al:yyyymmdd(new Date(d.getFullYear(),d.getMonth()+1,d.getDate()-1)),salvato:false};
+  }
+  const orig=per.salvato?per.dal:'',lista=obiettiviDi(per);
+  apriModal(`<h2>${nuovo?'Nuovo periodo':'Obiettivi e premi'}</h2>
+    <div class="two-col"><div><label>Parte il</label><input type="date" id="ob-dal" value="${per.dal}"></div><div><label>Finisce il</label><input type="date" id="ob-al" value="${per.al}"></div></div>
+    <div class="muted" style="margin-top:8px">Contano le demo fatte in questi giorni, il primo e l'ultimo compresi. Ogni tacca è una demo; il premio compare sotto l'ampolla e si sblocca quando è piena.</div>
     ${lista.map((o,i)=>`<div class="ob-riga"><div class="ob-nome">${esc(o.nome)}</div>
       ${o.parti?`<div class="two-col">${o.parti.map((pt,j)=>`<div><label>Demo ${esc(pt.nome)}</label><input type="number" id="ob-t-${i}-${j}" min="1" max="999" inputmode="numeric" value="${pt.tacche}"></div>`).join('')}</div>`
                :`<label>Demo da fare</label><input type="number" id="ob-t-${i}" min="1" max="999" inputmode="numeric" value="${o.tacche}">`}
       <label>Premio</label><input id="ob-p-${i}" maxlength="60" value="${esc(o.premio)}" placeholder="es. Buono Amazon da 50 €"></div>`).join('')}
-    <div class="ob-riga"><div class="ob-nome">Tutte e 5 piene</div><label>Premio finale</label><input id="ob-pranzo" maxlength="60" value="${esc(pranzoDelMese(mese))}"></div>
-    <div class="modal-actions"><button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaObiettivi('${mese}')">Salva</button></div>`);
+    <div class="ob-riga"><div class="ob-nome">Tutte e 5 piene</div><label>Premio finale</label><input id="ob-pranzo" maxlength="60" value="${esc(pranzoDi(per))}"></div>
+    <div class="modal-actions">${orig?`<button class="btn btn-danger" style="margin-right:auto" onclick="eliminaPeriodoOb('${orig}')">Elimina</button>`:''}<button class="btn" onclick="chiudiModal()">Annulla</button><button class="btn btn-primary" onclick="salvaObiettivi('${orig}')">Salva</button></div>`);
 }
-async function salvaObiettivi(mese){
+async function scriviCfgOb(nuovo){
+  const r=await api('cc_sync_state?k=eq.OBIETTIVI','PATCH',{v:JSON.stringify(nuovo)});
+  if(!r.length)await api('cc_sync_state','POST',{k:'OBIETTIVI',v:JSON.stringify(nuovo)});
+  _cfgObiettivi=nuovo;
+}
+async function salvaObiettivi(orig){
   if(!isDev(currentUser))return toast('Solo lo sviluppatore può cambiare obiettivi e premi');
   const v=id=>document.getElementById(id).value.trim(),num=id=>{const n=+v(id);return Number.isInteger(n)&&n>=1&&n<=999?n:null;};
+  const dal=v('ob-dal'),al=v('ob-al');
+  if(!isoOk(dal)||!isoOk(al))return toast('Scrivi il giorno in cui parte e quello in cui finisce');
+  if(al<dal)return toast('Il giorno in cui finisce viene prima di quello in cui parte');
+  if(giorniTra(dal,al)>366)return toast('Un periodo può durare al massimo un anno');
   const ampolle={};
-  for(const [i,o] of obiettiviDelMese(mese).entries()){
+  for(const [i,o] of OBIETTIVI.entries()){
     if(o.parti){const parti={};for(const [j,pt] of o.parti.entries()){const n=num(`ob-t-${i}-${j}`);if(!n)return toast(`${o.nome} ${pt.nome}: scrivi un numero intero da 1 a 999`);parti[pt.nome]=n;}ampolle[o.nome]={parti,premio:v(`ob-p-${i}`)};}
     else{const n=num(`ob-t-${i}`);if(!n)return toast(`${o.nome}: scrivi un numero intero da 1 a 999`);ampolle[o.nome]={tacche:n,premio:v(`ob-p-${i}`)};}
   }
   try{
-    await caricaCfgObiettivi();   // rileggo prima di scrivere, così non perdo i mesi già salvati
-    const nuovo={mesi:{..._cfgObiettivi.mesi,[mese]:{ampolle,pranzo:v('ob-pranzo')||'Pranzo tutti insieme'}}};
-    const r=await api('cc_sync_state?k=eq.OBIETTIVI','PATCH',{v:JSON.stringify(nuovo)});
-    if(!r.length)await api('cc_sync_state','POST',{k:'OBIETTIVI',v:JSON.stringify(nuovo)});
-    _cfgObiettivi=nuovo;chiudiModal();toast('Obiettivi e premi salvati');renderObiettivi(false);
+    await caricaCfgObiettivi();   // rileggo prima di scrivere, così non perdo i periodi già salvati
+    const altri=_cfgObiettivi.periodi.filter(x=>x.dal!==orig),urto=altri.find(x=>!(al<x.dal||dal>x.al));
+    if(urto)return toast(`Si accavalla con il periodo ${etichettaPeriodo(urto)}: cambia le date`);
+    await scriviCfgOb({..._cfgObiettivi,periodi:[...altri,{dal,al,ampolle,pranzo:v('ob-pranzo')||'Pranzo tutti insieme'}].sort(perData)});
+    _dalOb=dal;chiudiModal();toast('Obiettivi e premi salvati');renderObiettivi(false);
   }catch(e){toast('Errore: '+e.message);}
 }
-let _meseObiettivi=null;
+async function eliminaPeriodoOb(orig){
+  if(!isDev(currentUser))return;
+  const p=_cfgObiettivi.periodi.find(x=>x.dal===orig);if(!p)return chiudiModal();
+  if(!confirm(`Eliminare gli obiettivi ${etichettaPeriodo(p)}? Le demo restano: sparisce solo questo periodo con i suoi premi.`))return;
+  try{await caricaCfgObiettivi();await scriviCfgOb({..._cfgObiettivi,periodi:_cfgObiettivi.periodi.filter(x=>x.dal!==orig)});_dalOb=null;chiudiModal();toast('Periodo eliminato');renderObiettivi(false);}
+  catch(e){toast('Errore: '+e.message);}
+}
 async function renderObiettivi(anima){
-  const el=document.getElementById('tab-obiettivi'),p=periodoCorrente();
-  const mese=p.start.slice(0,7),r=meseRange(mese);
+  const el=document.getElementById('tab-obiettivi');
   if(!el.innerHTML||anima)el.innerHTML='<div class="loading"><div class="spinner"></div>Carico…</div>';
-  let righe;try{[righe]=await Promise.all([appCalendario(r.start,r.end),caricaCfgObiettivi()]);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
-  const demo=righe.filter(demoFatta),nomeMese=isoToDate(r.start).toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+  await caricaCfgObiettivi();
+  const per=periodoObiettivi();
+  let righe;try{righe=await appCalendario(per.dal,per.al);}catch(e){el.innerHTML=`<div class="alert alert-danger">Errore: ${esc(e.message)}</div>`;return;}
+  const demo=righe.filter(demoFatta);
   const contaFonte=(f,sq)=>demo.filter(x=>(tipoDi(x.tipo_codice).fonte||'')===f&&(!sq||opDi(x.operatrice_id).squadra===sq)).length;
-  const lista=obiettiviDelMese(mese),pranzoNome=pranzoDelMese(mese);
+  const lista=obiettiviDi(per),pranzoNome=pranzoDi(per);
   let piene=0;const pienaOgni=[];
   const carte=lista.map(o=>{
     const conta=o.parti?o.parti.map(pt=>contaFonte(o.fonte,pt.squadra)):[contaFonte(o.fonte)];
@@ -1385,9 +1429,11 @@ async function renderObiettivi(anima){
   }).join('');
   const tutte=piene===lista.length;
   const pranzo=`<div class="pranzo${tutte?' si':''}"><div class="ic"><i class="ti ti-tools-kitchen-2"></i></div><div><b>${esc(pranzoNome)}${tutte?': sbloccato!':''}</b><div class="muted">${tutte?'Tutte e 5 le ampolle sono piene. Complimenti a tutte!':`Si sblocca quando tutte e 5 le ampolle sono piene · adesso ${piene} su ${lista.length}`}</div></div><div class="pallini">${lista.map((o,i)=>`<span class="${pienaOgni[i]?'si':''}" style="color:${coloreFonte(o)}" title="${esc(o.nome)}${pienaOgni[i]?' · piena':''}">${pienaOgni[i]?CUORE_PIENO_IC:CUORE_VUOTO}</span>`).join('')}</div></div>`;
-  const modifica=isDev(currentUser)?`<button class="btn btn-sm" onclick="apriObiettivi('${mese}')"><i class="ti ti-pencil"></i> Modifica obiettivi e premi</button>`:'';
-  el.innerHTML=`<div class="ob-testa"><div class="section-title">Obiettivi di ${esc(nomeMese)} · demo fatte</div>${modifica}</div>
-    <div class="muted" style="padding:0 4px 10px">Ogni tacca è una demo fatta: gli appuntamenti del calendario già passati, tranne quelli grigi su Google. Le ampolle si colorano da sole man mano che le demo vengono fatte e il 1° del mese si svuotano. Il CC è diviso tra squadra Mattino (lobo sinistro) e Pomeriggio (lobo destro).</div>
+  const P=_cfgObiettivi.periodi,iP=P.findIndex(x=>x.dal===per.dal),st=statoPeriodo(per);
+  const frecce=P.length>1?`<button class="btn btn-sm" title="Periodo prima" onclick="frecciaOb(-1)"${iP<=0?' disabled':''}><i class="ti ti-chevron-left"></i></button><button class="btn btn-sm" title="Periodo dopo" onclick="frecciaOb(1)"${iP>=P.length-1?' disabled':''}><i class="ti ti-chevron-right"></i></button>`:'';
+  const azioni=isDev(currentUser)?`<button class="btn btn-sm" onclick="apriObiettivi(false)"><i class="ti ti-pencil"></i> Modifica obiettivi e premi</button>${P.length?`<button class="btn btn-sm" onclick="apriObiettivi(true)"><i class="ti ti-plus"></i> Nuovo periodo</button>`:''}`:'';
+  el.innerHTML=`<div class="ob-testa"><div class="ob-tit"><div class="section-title">Obiettivi ${esc(etichettaPeriodo(per))} · demo fatte</div><span class="pill bg-${st.cls} c-${st.cls}">${esc(st.txt)}</span></div><div class="ob-azioni">${frecce}${azioni}</div></div>
+    <div class="muted" style="padding:0 4px 10px">Ogni tacca è una demo fatta ${esc(etichettaPeriodo(per))}: gli appuntamenti del calendario già passati, tranne quelli grigi su Google (quelli di oggi contano da domani). Le ampolle si colorano da sole man mano che le demo vengono fatte${per.salvato?'':' e il 1° del mese si svuotano'}. Il CC è diviso tra squadra Mattino (lobo sinistro) e Pomeriggio (lobo destro).</div>
     ${pranzo}<div class="ampolle">${carte}</div>`;
   // a fine salita toglie le classi dell'apertura e le tacche grigie «di passaggio»: lo stato fermo è quello finale
   clearTimeout(_fineSalita);
